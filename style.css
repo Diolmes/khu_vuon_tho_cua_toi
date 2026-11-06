@@ -369,8 +369,9 @@ body.mode-fert #bin { animation: pulse 1s ease-in-out infinite; border-style: so
 #panel-close:hover, #basket-close:hover { opacity: 1; }
 #poem-meta { margin: 0 0 8px; font-size: .8rem; font-style: italic; opacity: .6; }
 #poem-meta:empty { display: none; }
-#poem-text { line-height: 1.9; font-size: 1.1rem; }
-.line { min-height: 1em; }
+#poem-text { line-height: 1.75; font-size: 1.1rem; }
+.line { text-wrap: balance; }                 /* câu dài xuống dòng thì chia đều hai dòng, không để một chữ cụt lủn */
+.line.gap { height: .8em; }                   /* khoảng ngăn giữa các khổ thơ */
 .sep { text-align: center; opacity: .45; margin: 14px 0; letter-spacing: 8px; }
 .word {
   cursor: pointer;
@@ -568,6 +569,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 @media (min-width: 901px) and (max-width: 1560px) {
   #toolbar { top: calc(74px + env(safe-area-inset-top)); left: 0; right: 0; justify-content: center; flex-wrap: wrap; gap: 6px; }
   #mode-banner { top: calc(122px + env(safe-area-inset-top)); }
+  #poem-panel { top: calc(126px + env(safe-area-inset-top)); max-height: calc(100vh - 256px); }
 }
 
 /* màn hình rất lớn */
@@ -589,6 +591,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     gap: 6px;
   }
   #mode-banner { top: calc(122px + env(safe-area-inset-top)); }
+  #poem-panel { top: calc(126px + env(safe-area-inset-top)); max-height: calc(100vh - 256px); }
   #poem-panel { width: min(340px, calc(100vw - 32px)); }
 }
 
@@ -628,7 +631,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     max-height: 46vh;
     padding: 18px 18px 12px;
   }
-  #poem-text { font-size: 1.02rem; line-height: 1.8; }
+  #poem-text { font-size: 1.02rem; line-height: 1.7; }
 
   /* giỏ hoa */
   #basket-overlay { padding: 8px; }

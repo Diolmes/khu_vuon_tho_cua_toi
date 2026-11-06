@@ -360,6 +360,21 @@ function parseText(text) {
     line.split(/(\s+)/).filter((s) => s !== "").map((part) =>
       /^\s+$/.test(part) ? { t: part, ws: true } : { t: part, idx: idx++ }));
 }
+// Dọn khoảng cách dòng: bỏ khoảng trắng thừa ở đầu/cuối mỗi dòng, bỏ dòng trống ở đầu và cuối bài,
+// nhiều dòng trống liền nhau chỉ giữ một (ngăn cách khổ thơ). Dòng trống = mảng rỗng [].
+function tidyLines(text) {
+  const out = [];
+  parseText(text).forEach((line) => {
+    let a = 0, b = line.length;
+    while (a < b && line[a].ws) a++;
+    while (b > a && line[b - 1].ws) b--;
+    const l = line.slice(a, b);
+    if (l.length) out.push(l);
+    else if (out.length && out[out.length - 1].length) out.push([]);
+  });
+  while (out.length && !out[out.length - 1].length) out.pop();
+  return out;
+}
 const isMissing = (p, pi, ti) => p.missing.includes(pi + ":" + ti);
 
 function wordsOf(p) {
@@ -372,7 +387,7 @@ function wordsOf(p) {
   return set;
 }
 function plainText(p, pi) {
-  return parseText(p.texts[pi]).map((line) =>
+  return tidyLines(p.texts[pi]).map((line) =>
     line.map((w) => (!w.ws && isMissing(p, pi, w.idx) ? "···" : w.t)).join("")).join("\n");
 }
 
@@ -672,9 +687,9 @@ function renderPoem(p) {
       sep.textContent = "✿";
       poemText.appendChild(sep);
     }
-    parseText(text).forEach((line) => {
+    tidyLines(text).forEach((line) => {
       const div = document.createElement("div");
-      div.className = "line";
+      div.className = line.length ? "line" : "line gap";
       line.forEach((w) => {
         if (w.ws) { div.append(w.t); return; }
         const span = document.createElement("span");
