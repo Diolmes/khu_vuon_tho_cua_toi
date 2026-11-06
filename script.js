@@ -755,7 +755,8 @@ function buildCard(p) {
   const gift = document.createElement("button");
   gift.textContent = "🎁 Tặng";
   gift.addEventListener("click", () => askGift(p));
-  actions.append(replant, gift);
+  actions.append(replant);
+  if (isOwner()) actions.append(gift);          // chỉ chủ vườn được tặng hoa
   card.appendChild(actions);
   return card;
 }
@@ -763,6 +764,7 @@ function buildCard(p) {
 // Hộp thoại "ô ghi tên": ghi tên người nhận (hoặc bỏ qua) rồi mới tặng
 let giftTarget = null;
 function askGift(p) {
+  if (!isOwner()) return;
   giftTarget = p;
   $("gift-name").value = "";
   $("gift-overlay").hidden = false;
@@ -781,6 +783,7 @@ $("gift-overlay").addEventListener("click", (e) => { if (e.target === $("gift-ov
 
 // Tặng = vẽ thẻ hoa thành ảnh PNG, chép vào clipboard (nếu trình duyệt không cho thì tải ảnh về), rồi bỏ khỏi giỏ
 async function giftPoem(p, to = "") {
+  if (!isOwner()) return;
   const blobPromise = renderCardPNG(p, to);
   let how = null;
   try {

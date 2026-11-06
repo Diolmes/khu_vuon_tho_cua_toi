@@ -8,7 +8,7 @@
 
       "poems": {
         "$id": {
-          ".write": "auth != null && (data.exists() || auth.token.email == 'chu-vuon@khuvuontho.app' || newData.child('hybrid').val() == true)"
+          ".write": "auth != null && ((data.exists() && newData.exists()) || auth.token.email == 'chu-vuon@khuvuontho.app' || (!data.exists() && newData.child('hybrid').val() == true))"
         }
       },
       "fallen":   { ".write": "auth != null" },
