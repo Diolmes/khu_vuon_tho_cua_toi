@@ -1,0 +1,5 @@
+# Không đưa bí mật lên GitHub
+github-token.txt
+*.token
+.env
+.DS_Store
