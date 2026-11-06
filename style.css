@@ -120,6 +120,10 @@ body.raining #sky-dim { opacity: 1; }
   animation: grow 1.4s cubic-bezier(.2, 1.4, .4, 1) both;
 }
 .flower.settled { animation: none; }
+/* Ô chứa hoa là hình chữ nhật trong suốt, bông phía trước che mất đầu bông phía sau.
+   Chỉ phần có nét vẽ của hoa mới nhận con trỏ, để rê vào hoa nào thì hoa đó toả hương và mở bài thơ. */
+.flower { pointer-events: none; }
+.flower svg * { pointer-events: visiblePainted; }
 .flower svg {
   display: block;
   width: 100%;
@@ -295,6 +299,8 @@ body.mode-fert .flower.droop svg { filter: drop-shadow(0 0 8px #8fd16a); }
   border-radius: 18px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
   cursor: pointer;
+  touch-action: none;                 /* điện thoại: để ngón tay kéo được cục phân, không bị trình duyệt giành cử chỉ */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   display: flex; flex-direction: column; align-items: center;
   transition: transform .2s, box-shadow .2s;
 }
@@ -689,7 +695,8 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 .demo #log-btn,
 .demo #export-btn,
 .demo #import-btn,
-body:not(.guest) #demo-btn { display: none !important; }
+body:not(.guest) #demo-btn,
+body:not(.guest) #avatar-btn { display: none !important; }
 
 /* ---------- Cổng vào ---------- */
 body.locked #garden, body.locked #toolbar, body.locked #bin, body.locked #net,
@@ -927,3 +934,78 @@ body.locked #seed-box, body.locked #who, body.locked #bee-layer { visibility: hi
   font: inherit; font-size: .82rem; flex: none; background: #fff; color: var(--ink);
   border: 2px solid #e2c15a; border-radius: 999px; padding: 4px 12px; cursor: pointer;
 }
+
+/* ---------- Bảng thơ của hoa trong giỏ: hiện đè lên giỏ ---------- */
+#poem-panel.from-basket { z-index: 60; }
+
+/* ---------- Nhân vật của khách ---------- */
+#char-layer { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.char { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; transition: opacity .4s; }
+.char.idle { opacity: .45; }
+.char::before {
+  content: ""; position: absolute; left: -22px; top: -5px; width: 44px; height: 10px;
+  border-radius: 50%; background: rgba(40, 60, 30, .25);
+}
+.char-body { position: absolute; left: -36px; bottom: 0; width: 72px; height: 72px; transform-origin: 50% 100%; }
+.char-body img { width: 72px; height: 72px; display: block; transform-origin: 50% 100%; }
+.char span {
+  position: absolute; top: 6px; left: 0; transform: translateX(-50%);
+  white-space: nowrap; font-size: .72rem; color: #fff;
+  padding: 1px 8px; border-radius: 999px; background: var(--c, #7a5a8a);
+}
+
+/* ---------- Khung vẽ nhân vật ---------- */
+.avatar-row { display: flex; align-items: center; gap: 8px; }
+.avatar-row button { flex: 1; font-size: .85rem; padding: 6px 10px; }
+#gate-avatar-preview { width: 44px; height: 44px; object-fit: contain; border-radius: 10px; background: #fff; border: 1px solid #e6d9c6; }
+#draw-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(70, 50, 40, .42);
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; overflow: auto;
+}
+#draw-overlay[hidden] { display: none; }
+#draw-box {
+  position: relative;
+  width: min(560px, 100%);
+  background: var(--card); border-radius: 22px; padding: 20px 20px 16px;
+  animation: pop .3s ease-out;
+}
+#draw-box h2 { margin: 0 0 4px; font-weight: normal; font-size: 1.25rem; }
+.draw-sub { margin: 0 0 12px; font-size: .85rem; opacity: .7; }
+#draw-close { position: absolute; top: 6px; right: 12px; border: none; background: none; font-size: 1.6rem; color: var(--ink); opacity: .5; cursor: pointer; }
+#draw-close:hover { opacity: 1; }
+.draw-main { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+#draw-canvas {
+  width: min(240px, 70vw); height: min(240px, 70vw); flex: none; align-self: flex-start;
+  border-radius: 14px; border: 2px solid var(--accent); touch-action: none; cursor: crosshair;
+  background:
+    repeating-conic-gradient(#f3ead9 0% 25%, #fffdf7 0% 50%) 50% / 20px 20px;
+}
+.draw-tools { display: flex; flex-direction: column; gap: 8px; min-width: 150px; flex: 1; }
+.tool-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.wheel-row { display: flex; align-items: center; gap: 10px; }
+#color-wheel { width: 132px; height: 132px; border-radius: 50%; touch-action: none; cursor: crosshair; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+#color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #bbb; background: #e8453c; }
+.draw-tools label { display: flex; flex-direction: column; gap: 2px; font-size: .78rem; opacity: .85; }
+.draw-tools input[type=range] { width: 100%; }
+.draw-tools button, .draw-actions button {
+  font: inherit; font-size: .85rem; background: var(--card); color: var(--ink);
+  border: 2px solid var(--accent); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.draw-tools button:hover, .draw-actions button:hover { background: #ffeef2; }
+.draw-tools button.on { background: var(--accent); color: #fff; }
+.draw-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.draw-actions #draw-done { background: var(--accent); color: #fff; padding: 6px 22px; }
+
+/* ---------- Căn lề bài thơ ---------- */
+#align-bar { display: flex; gap: 4px; margin: 0 0 8px; }
+#align-bar button {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 26px; padding: 0;
+  background: #fff; border: 1px solid #e6d9c6; border-radius: 8px;
+  color: var(--ink); opacity: .6; cursor: pointer;
+}
+#align-bar button svg { fill: currentColor; }
+#align-bar button:hover { opacity: 1; }
+#align-bar button.on { opacity: 1; background: var(--accent); border-color: var(--accent); color: #fff; }

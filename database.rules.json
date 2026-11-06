@@ -32,7 +32,10 @@
     "presence": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && auth.uid == $uid",
+        "avatar": {
+          ".validate": "newData.isString() && newData.val().length < 40000 && newData.val().beginsWith('data:image/png;base64,')"
+        }
       }
     },
     "visits": {

@@ -45,6 +45,7 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 */
 let state;              // bản sao dữ liệu vườn, cập nhật qua các listener của máy chủ
 let openId = null;      // bài thơ đang mở
+let panelFromBasket = false;   // bảng thơ đang mở cho một bông hoa trong giỏ
 let pickedWord = null;  // từ đang được chọn
 let mode = null;        // {type:"place", id} | {type:"fert"}
 
@@ -643,10 +644,13 @@ seedForm.addEventListener("drop", (e) => {                         // thả ản
 });
 
 // ---------- Mở bài thơ ----------
-function openPoem(id) {
+function openPoem(id, fromBasket = false) {
   const p = getPoem(id);
-  if (!p || p.status !== "garden") return;
-  closeBasket();
+  if (!p || p.status !== (fromBasket ? "basket" : "garden")) return;
+  if (!fromBasket) closeBasket();       // hoa trong giỏ: bảng thơ hiện đè lên giỏ, giỏ vẫn mở phía sau
+  panelFromBasket = fromBasket;
+  panel.classList.toggle("from-basket", fromBasket);
+  $("delete-btn").style.display = fromBasket ? "none" : "";
   openId = id;
   pickedWord = null;
   renderPoem(p);
@@ -688,8 +692,23 @@ function renderPoem(p) {
   });
 }
 
+// Căn lề bài thơ (trái / giữa / phải): mỗi người tự chọn, nhớ trên máy của mình
+const ALIGN_KEY = "khuVuonCanLe";
+let poemAlign = (() => { try { const a = localStorage.getItem(ALIGN_KEY); return ["left", "center", "right"].includes(a) ? a : "left"; } catch { return "left"; } })();
+function applyAlign() {
+  poemText.style.textAlign = poemAlign;
+  document.querySelectorAll("#align-bar button").forEach((b) => b.classList.toggle("on", b.dataset.align === poemAlign));
+}
+document.querySelectorAll("#align-bar button").forEach((b) => b.addEventListener("click", () => {
+  poemAlign = b.dataset.align;
+  try { localStorage.setItem(ALIGN_KEY, poemAlign); } catch {}
+  applyAlign();
+}));
+applyAlign();
+
 function closePanel() {
   panel.hidden = true;
+  panelFromBasket = false;
   openId = null;
   pickedWord = null;
   applyGlow();
@@ -778,12 +797,12 @@ function buildCard(p) {
     t.style.fontSize = Math.max(3, (w / vbW) * 100 * 0.14) + "cqw";
     art.appendChild(t);
   });
-  art.addEventListener("click", () => art.classList.toggle("open"));
+  art.addEventListener("click", () => openPoem(p.id, true));      // bấm vào hoa: bài thơ hiện như hoa trong vườn
   card.appendChild(art);
 
   const hint = document.createElement("p");
   hint.className = "card-hint";
-  hint.textContent = p.gift ? `🎁 tặng từ ${p.from || "một người bạn"} · chạm vào hoa để đọc to` : "chạm vào hoa để đọc to";
+  hint.textContent = p.gift ? `🎁 tặng từ ${p.from || "một người bạn"} · chạm vào hoa để đọc` : "chạm vào hoa để đọc";
   card.appendChild(hint);
 
   const actions = document.createElement("div");
@@ -797,7 +816,15 @@ function buildCard(p) {
   const gift = document.createElement("button");
   gift.textContent = "🎁 Tặng";
   gift.addEventListener("click", () => askGift(p));
+  const trash = document.createElement("button");
+  trash.textContent = "🗑️ Thùng rác hữu cơ";
+  trash.addEventListener("click", () => {
+    if (!confirm("Bỏ hẳn bông hoa này vào thùng rác hữu cơ?\nBông hoa sẽ biến mất và không lấy lại được.")) return;
+    db.ref("garden/poems/" + p.id).remove();
+    toast("Đã bỏ bông hoa vào thùng rác hữu cơ 🗑️");
+  });
   actions.append(replant);
+  if (isOwner()) actions.append(trash);          // xóa hẳn: chỉ chủ vườn
   if (isOwner() && !p.gift) actions.append(gift);   // chỉ chủ vườn được tặng hoa, và hoa được tặng thì không tặng lại
   card.appendChild(actions);
   return card;
@@ -1556,10 +1583,13 @@ function applyPoem(id, d) {
       if (!el) { renderFlower(p, Date.now() - (p.t || 0) < 15000); applyGlow(); }
       else { placeFlower(el, p); updateDroop(el, p); }
     }
-    if (openId === id) { renderPoem(p); applyGlow(); }
+    if (openId === id) {
+      if (panelFromBasket) closePanel();      // hoa vừa được trồng lại
+      else { renderPoem(p); applyGlow(); }
+    }
   } else {
     flowerEl(id)?.remove();
-    if (openId === id) closePanel();
+    if (openId === id) { if (panelFromBasket) renderPoem(p); else closePanel(); }
   }
   refreshAfterPoems();
 }
@@ -1759,6 +1789,7 @@ function updateWho() {
 function setPeer(uid, d) {
   peers[uid] = d;
   updateWho();
+  const hasChar = setCharacter(uid, d);
   if (uid === ME.uid) return;
   let el = cursorEls[uid];
   if (!el) {
@@ -1770,11 +1801,13 @@ function setPeer(uid, d) {
     cursorEls[uid] = el;
   }
   el.querySelector("span").textContent = (d.role === "owner" ? "🌷 " : "") + d.name;
+  el.style.display = hasChar ? "none" : "";       // có nhân vật thì nhân vật thay con trỏ
   el.style.transform = `translate(${clamp(d.x, 0, 1) * window.innerWidth}px, ${clamp(d.y, 0, 1) * window.innerHeight}px)`;
   el.classList.toggle("idle", Date.now() - (d.t || 0) > 45000);
 }
 function removePeer(uid) {
   delete peers[uid];
+  removeCharacter(uid);
   cursorEls[uid]?.remove();
   delete cursorEls[uid];
   updateWho();
@@ -1782,7 +1815,12 @@ function removePeer(uid) {
 function startPresence() {
   const me = db.ref("presence/" + ME.uid);
   me.onDisconnect().remove();
-  me.set({ name: ME.name, role: ROLE, x: 0.5, y: 0.5, t: Date.now() });
+  const av = isOwner() ? "" : myAvatar();       // nhân vật chỉ dành cho khách
+  me.set({ name: ME.name, role: ROLE, x: 0.5, y: 0.5, t: Date.now(), ...(av ? { avatar: av } : {}) });
+  document.addEventListener("pointermove", (e) => {          // nhân vật của mình đi theo con trỏ ngay, không chờ máy chủ
+    const c = chars[ME.uid];
+    if (c) { c.nx = e.clientX / window.innerWidth; c.ny = e.clientY / window.innerHeight; }
+  }, { passive: true });
   let last = 0;
   document.addEventListener("pointermove", (e) => {
     const now = Date.now();
@@ -1799,6 +1837,201 @@ function startPresence() {
   ps.on("child_changed", (s) => setPeer(s.key, s.val()));
   ps.on("child_removed", (s) => removePeer(s.key));
 }
+
+// ---------- Nhân vật của khách (tự vẽ, không bắt buộc) ----------
+const AVATAR_KEY = "khuVuonNhanVat";
+const validAvatar = (s) => typeof s === "string" && s.startsWith("data:image/png;base64,") && s.length < 40000;
+function myAvatar() { try { const a = localStorage.getItem(AVATAR_KEY); return validAvatar(a) ? a : ""; } catch { return ""; } }
+
+function refreshAvatarPreview() {
+  const a = myAvatar();
+  const img = $("gate-avatar-preview");
+  img.hidden = !a;
+  if (a) img.src = a;
+  $("gate-draw").textContent = a ? "🎨 Vẽ lại nhân vật" : "🎨 Vẽ nhân vật (không bắt buộc)";
+}
+function setMyAvatar(a) {
+  try { a ? localStorage.setItem(AVATAR_KEY, a) : localStorage.removeItem(AVATAR_KEY); } catch {}
+  refreshAvatarPreview();
+  if (ME && entered) (realDb || db).ref("presence/" + ME.uid).update({ avatar: a || null });
+}
+
+// Nhân vật đi bộ trong vườn theo con trỏ của chủ nhân (chỉ đi trên phần đất)
+const chars = {};          // uid -> { el, body, img, nx, ny, x, y, face, phase, moving }
+function setCharacter(uid, d) {
+  if (!validAvatar(d.avatar)) { removeCharacter(uid); return false; }
+  let c = chars[uid];
+  if (!c) {
+    const el = document.createElement("div");
+    el.className = "char";
+    el.style.setProperty("--c", `hsl(${hueOf(uid)} 55% 42%)`);
+    el.innerHTML = `<div class="char-body"><img alt="" draggable="false"></div><span></span>`;
+    $("char-layer").appendChild(el);
+    c = chars[uid] = { el, body: el.firstChild, img: el.querySelector("img"), label: el.querySelector("span"), src: "", nx: d.x ?? 0.5, ny: d.y ?? 0.5, x: null, y: null, face: 1, phase: 0, moving: false };
+  }
+  if (c.src !== d.avatar) { c.src = d.avatar; c.img.src = d.avatar; }
+  c.label.textContent = (d.role === "owner" ? "🌷 " : "") + (d.name || "");
+  if (!ME || uid !== ME.uid) { c.nx = d.x ?? c.nx; c.ny = d.y ?? c.ny; }
+  c.el.classList.toggle("idle", Date.now() - (d.t || 0) > 45000);
+  return true;
+}
+function removeCharacter(uid) {
+  const c = chars[uid];
+  if (!c) return;
+  c.el.remove();
+  delete chars[uid];
+}
+let charLast = performance.now();
+function charLoop(now) {
+  const dt = Math.min(0.05, (now - charLast) / 1000);
+  charLast = now;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const top = vh * 0.5, bottom = vh - 28;                // phần đất: nửa dưới màn hình
+  for (const uid in chars) {
+    const c = chars[uid];
+    const tx = clamp(c.nx * vw, 36, vw - 36), ty = clamp(c.ny * vh, top, bottom);
+    if (c.x === null) { c.x = tx; c.y = ty; }
+    const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy);
+    const s = 0.55 + 0.6 * clamp((c.y - top) / (vh - top), 0, 1);       // ở xa thì bé, ở gần thì to
+    if (dist > 4) {
+      const step = Math.min(dist, 190 * s * dt);
+      c.x += (dx / dist) * step;
+      c.y += (dy / dist) * step;
+      if (Math.abs(dx) > 3) c.face = dx > 0 ? 1 : -1;
+      c.moving = true;
+      c.phase += dt * 11;
+    } else {
+      c.moving = false;
+      c.phase += dt * 2;
+    }
+    const bob = c.moving ? -Math.abs(Math.sin(c.phase)) * 7 : Math.sin(c.phase) * 1.4;
+    c.el.style.transform = `translate(${c.x}px, ${c.y}px)`;
+    c.el.style.zIndex = Math.round(c.y);
+    c.body.style.transform = `scale(${s})`;
+    c.img.style.transform = `translateY(${bob}px) rotate(${c.moving ? Math.sin(c.phase) * 5 : 0}deg) scaleX(${c.face})`;
+  }
+  requestAnimationFrame(charLoop);
+}
+requestAnimationFrame(charLoop);
+
+// ----- Khung vẽ nhân vật: bút marker, bánh xe màu, tẩy -----
+const dc = $("draw-canvas");
+const dctx = dc.getContext("2d", { willReadFrequently: true });
+const wheel = $("color-wheel");
+let drawTool = "pen", penH = 0, penS = 0.85, penV = 0.95, penSize = 9, drawing = false, lastPt = null;
+const undoStack = [];
+
+function hsv2rgb(h, s, v) {
+  const f = (n) => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [Math.round(f(5) * 255), Math.round(f(3) * 255), Math.round(f(1) * 255)];
+}
+const penColor = () => `rgb(${hsv2rgb(penH, penS, penV).join(",")})`;
+function drawWheel() {
+  const g = wheel.getContext("2d"), n = wheel.width, R = n / 2;
+  const img = g.createImageData(n, n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const dx = x - R + 0.5, dy = y - R + 0.5, r = Math.hypot(dx, dy);
+    if (r > R) continue;
+    const [rr, gg, bb] = hsv2rgb((Math.atan2(dy, dx) / (Math.PI * 2) + 1) % 1, r / R, penV);
+    const i = (y * n + x) * 4;
+    img.data[i] = rr; img.data[i + 1] = gg; img.data[i + 2] = bb; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const a = penH * Math.PI * 2, rr = penS * (R - 3);       // vòng tròn đánh dấu màu đang chọn
+  g.beginPath();
+  g.arc(R + Math.cos(a) * rr, R + Math.sin(a) * rr, 6, 0, Math.PI * 2);
+  g.lineWidth = 2.5; g.strokeStyle = "#fff"; g.stroke();
+  g.lineWidth = 1; g.strokeStyle = "#333"; g.stroke();
+  $("color-swatch").style.background = penColor();
+}
+function pickColor(e) {
+  const r = wheel.getBoundingClientRect();
+  const dx = (e.clientX - r.left) / r.width * wheel.width - wheel.width / 2;
+  const dy = (e.clientY - r.top) / r.height * wheel.height - wheel.height / 2;
+  penH = (Math.atan2(dy, dx) / (Math.PI * 2) + 1) % 1;
+  penS = clamp(Math.hypot(dx, dy) / (wheel.width / 2 - 3), 0, 1);
+  setTool("pen");
+  drawWheel();
+}
+let pickingColor = false;
+wheel.addEventListener("pointerdown", (e) => { e.preventDefault(); wheel.setPointerCapture(e.pointerId); pickingColor = true; pickColor(e); });
+wheel.addEventListener("pointermove", (e) => { if (pickingColor) pickColor(e); });
+["pointerup", "pointercancel"].forEach((t) => wheel.addEventListener(t, () => { pickingColor = false; }));
+$("color-val").addEventListener("input", (e) => { penV = e.target.value / 100; setTool("pen"); drawWheel(); });
+$("brush-size").addEventListener("input", (e) => { penSize = +e.target.value; });
+
+function setTool(t) {
+  drawTool = t;
+  $("tool-pen").classList.toggle("on", t === "pen");
+  $("tool-eraser").classList.toggle("on", t === "eraser");
+}
+$("tool-pen").addEventListener("click", () => setTool("pen"));
+$("tool-eraser").addEventListener("click", () => setTool("eraser"));
+
+const dpos = (e) => { const r = dc.getBoundingClientRect(); return { x: (e.clientX - r.left) * dc.width / r.width, y: (e.clientY - r.top) * dc.height / r.height }; };
+function stroke(a, b) {
+  dctx.save();
+  dctx.globalCompositeOperation = drawTool === "eraser" ? "destination-out" : "source-over";
+  dctx.strokeStyle = penColor();
+  dctx.lineWidth = drawTool === "eraser" ? penSize * 1.8 : penSize;
+  dctx.lineCap = dctx.lineJoin = "round";
+  dctx.beginPath();
+  dctx.moveTo(a.x, a.y);
+  dctx.lineTo(b.x + 0.01, b.y);
+  dctx.stroke();
+  dctx.restore();
+}
+function pushUndo() {
+  undoStack.push(dctx.getImageData(0, 0, dc.width, dc.height));
+  if (undoStack.length > 25) undoStack.shift();
+}
+dc.addEventListener("pointerdown", (e) => { e.preventDefault(); dc.setPointerCapture(e.pointerId); pushUndo(); drawing = true; lastPt = dpos(e); stroke(lastPt, lastPt); });
+dc.addEventListener("pointermove", (e) => { if (!drawing) return; const p = dpos(e); stroke(lastPt, p); lastPt = p; });
+["pointerup", "pointercancel"].forEach((t) => dc.addEventListener(t, () => { drawing = false; }));
+$("draw-undo").addEventListener("click", () => { const im = undoStack.pop(); if (im) dctx.putImageData(im, 0, 0); });
+$("draw-clear").addEventListener("click", () => { pushUndo(); dctx.clearRect(0, 0, dc.width, dc.height); });
+
+function openDraw() {
+  undoStack.length = 0;
+  dctx.clearRect(0, 0, dc.width, dc.height);
+  const a = myAvatar();
+  if (a) { const im = new Image(); im.onload = () => dctx.drawImage(im, 0, 0, dc.width, dc.height); im.src = a; }   // vẽ lại từ nhân vật cũ
+  setTool("pen");
+  drawWheel();
+  $("draw-overlay").hidden = false;
+}
+function closeDraw() { $("draw-overlay").hidden = true; drawing = false; }
+
+// Cắt sát hình vẽ, thu về ảnh 96x96, chân nhân vật nằm sát đáy
+function exportAvatar() {
+  const { width: w, height: h } = dc;
+  const d = dctx.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (d[(y * w + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) return "";
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, N = 96;
+  const k = Math.min((N - 4) / bw, (N - 4) / bh);
+  const out = document.createElement("canvas");
+  out.width = out.height = N;
+  const g = out.getContext("2d");
+  g.imageSmoothingQuality = "high";
+  g.drawImage(dc, x0, y0, bw, bh, (N - bw * k) / 2, N - 2 - bh * k, bw * k, bh * k);
+  return out.toDataURL("image/png");
+}
+$("draw-done").addEventListener("click", () => {
+  const a = exportAvatar();
+  closeDraw();
+  setMyAvatar(a);
+  toast(a ? "Đã lưu nhân vật của bạn 🎨" : "Bạn chưa vẽ gì nên chưa có nhân vật.");
+});
+$("draw-remove").addEventListener("click", () => { closeDraw(); setMyAvatar(""); toast("Đã bỏ nhân vật."); });
+$("draw-close").addEventListener("click", closeDraw);
+$("draw-overlay").addEventListener("click", (e) => { if (e.target === $("draw-overlay")) closeDraw(); });
+$("gate-draw").addEventListener("click", openDraw);
+$("avatar-btn").addEventListener("click", openDraw);
+refreshAvatarPreview();
 
 // ---------- Nhật ký ra vào vườn ----------
 let visitRef = null;
@@ -2010,7 +2243,9 @@ function startGarden() {
 // ---------- Phím tắt ----------
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!$("gift-overlay").hidden) closeGift();
+  if (!$("draw-overlay").hidden) closeDraw();
+  else if (!panel.hidden && panelFromBasket) closePanel();
+  else if (!$("gift-overlay").hidden) closeGift();
   else if (!$("seedgift-overlay").hidden) closeSeedGifts();
   else if (!$("log-overlay").hidden) closeLog();
   else if (!$("basket-overlay").hidden) closeBasket();

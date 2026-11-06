@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Khu vườn thơ của tôi</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <div id="sky" aria-hidden="true"></div>
@@ -27,6 +27,7 @@
   <!-- Thanh công cụ -->
   <div id="toolbar">
     <button id="basket-btn" type="button">🧺 Giỏ <span id="basket-count">0</span></button>
+    <button id="avatar-btn" type="button" title="Vẽ nhân vật của bạn để đi dạo trong vườn">🎨 Nhân vật</button>
     <button id="gifts-btn" type="button" title="Hạt giống khách tặng bạn">🎁 Hạt được tặng <span id="gifts-count">0</span></button>
     <button id="demo-btn" type="button" title="Thử làm chủ vườn. Mọi thay đổi chỉ để thử và biến mất khi thoát">🎭 Hóa thân chủ vườn</button>
     <button id="rain-btn" type="button" title="Gọi mưa">☔</button>
@@ -95,6 +96,11 @@
   <aside id="poem-panel" hidden>
     <button id="panel-close" type="button" aria-label="Đóng">×</button>
     <p id="poem-meta"></p>
+    <div id="align-bar" role="group" aria-label="Căn lề bài thơ">
+      <button type="button" data-align="left" title="Căn lề trái" aria-label="Căn lề trái"><svg viewBox="0 0 16 14" width="16" height="14" aria-hidden="true"><rect x="0" y="1" width="16" height="2" rx="1"/><rect x="0" y="6" width="10" height="2" rx="1"/><rect x="0" y="11" width="13" height="2" rx="1"/></svg></button>
+      <button type="button" data-align="center" title="Căn giữa" aria-label="Căn giữa"><svg viewBox="0 0 16 14" width="16" height="14" aria-hidden="true"><rect x="0" y="1" width="16" height="2" rx="1"/><rect x="3" y="6" width="10" height="2" rx="1"/><rect x="1.5" y="11" width="13" height="2" rx="1"/></svg></button>
+      <button type="button" data-align="right" title="Căn lề phải" aria-label="Căn lề phải"><svg viewBox="0 0 16 14" width="16" height="14" aria-hidden="true"><rect x="0" y="1" width="16" height="2" rx="1"/><rect x="6" y="6" width="10" height="2" rx="1"/><rect x="3" y="11" width="13" height="2" rx="1"/></svg></button>
+    </div>
     <div id="poem-text"></div>
     <p id="word-info"></p>
     <button id="delete-btn" type="button">hái bông hoa này bỏ vào giỏ</button>
@@ -140,6 +146,7 @@
   </div>
 
   <div id="who" hidden></div>
+  <div id="char-layer" aria-hidden="true"></div>
   <div id="cursor-layer" aria-hidden="true"></div>
   <input type="file" id="import-file" accept="application/json,.json" hidden>
 
@@ -168,6 +175,10 @@
         <form id="gate-guest" class="gate-col" autocomplete="off">
           <h2>🐝 Khách</h2>
           <input id="guest-name" type="text" placeholder="Tên của bạn" maxlength="24">
+          <div class="avatar-row">
+            <button type="button" id="gate-draw">🎨 Vẽ nhân vật (không bắt buộc)</button>
+            <img id="gate-avatar-preview" alt="Nhân vật của bạn" hidden>
+          </div>
           <button type="submit">Vào vườn</button>
           <p class="gate-err" id="guest-err"></p>
         </form>
@@ -176,10 +187,42 @@
     </div>
   </div>
 
+  <!-- Vẽ nhân vật -->
+  <div id="draw-overlay" hidden>
+    <div id="draw-box">
+      <button id="draw-close" type="button" aria-label="Đóng">×</button>
+      <h2>🎨 Vẽ nhân vật của bạn</h2>
+      <p class="draw-sub">Vẽ bằng bút marker. Nhân vật sẽ đi loanh quanh trong vườn, theo con trỏ của bạn.</p>
+      <div class="draw-main">
+        <canvas id="draw-canvas" width="240" height="240"></canvas>
+        <div class="draw-tools">
+          <div class="tool-row">
+            <button type="button" id="tool-pen" class="on">✏️ Bút</button>
+            <button type="button" id="tool-eraser">🧽 Tẩy</button>
+          </div>
+          <div class="wheel-row">
+            <canvas id="color-wheel" width="132" height="132"></canvas>
+            <span id="color-swatch" title="Màu đang chọn"></span>
+          </div>
+          <label>Sáng / tối <input id="color-val" type="range" min="0" max="100" value="95"></label>
+          <label>Cỡ nét <input id="brush-size" type="range" min="2" max="30" value="9"></label>
+          <div class="tool-row">
+            <button type="button" id="draw-undo">↩️ Hoàn tác</button>
+            <button type="button" id="draw-clear">🗑 Xóa hết</button>
+          </div>
+        </div>
+      </div>
+      <div class="draw-actions">
+        <button type="button" id="draw-remove">Không dùng nhân vật</button>
+        <button type="button" id="draw-done">Xong</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" role="status"></div>
 
-  <script src="firebase-config.js?v=3"></script>
-  <script src="backend.js?v=3"></script>
-  <script src="script.js?v=3"></script>
+  <script src="firebase-config.js?v=8"></script>
+  <script src="backend.js?v=8"></script>
+  <script src="script.js?v=8"></script>
 </body>
 </html>
