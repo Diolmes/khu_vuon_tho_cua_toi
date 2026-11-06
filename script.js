@@ -1575,7 +1575,8 @@ function touchPoem(id) {
 }
 
 const BTF_MAX = 3;            // tối đa 3 con bướm trong vườn cùng lúc
-const BTF_LIFE = 36000;       // một chuyến bay dài tối đa chừng này mili giây (quá hạn thì coi như đã bay đi)
+const BTF_LIFE = 42000;       // một chuyến bay dài tối đa chừng này mili giây (quá hạn thì coi như đã bay đi, đề phòng máy gọi bướm bị tắt giữa chừng)
+const BTF_SLOT_DELAY = 3000;  // bướm bay khỏi màn hình rồi, chờ chừng này mili giây mới trả chỗ
 const btfActive = new Set();
 async function runButterfly(poemId, seedId = "", owned = false) {
   if (btfActive.has(seedId)) return;
@@ -1636,7 +1637,8 @@ async function runButterfly(poemId, seedId = "", owned = false) {
   } finally {
     el.remove();
     btfActive.delete(seedId);
-    if (owned) { try { db.ref("garden/butterfly/" + seedId).remove(); } catch {} }     // bay đi rồi: trả chỗ cho con khác
+    // bay đi khỏi màn hình khoảng 3 giây thì mới trả chỗ cho con khác
+    if (owned) setTimeout(() => { try { db.ref("garden/butterfly/" + seedId).remove(); } catch {} }, BTF_SLOT_DELAY);
   }
 }
 
