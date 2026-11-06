@@ -104,6 +104,7 @@ body.raining #sky-dim { opacity: 1; }
 }
 #empty-hint {
   position: absolute;
+  z-index: 2;
   top: 45%; width: 100%;
   text-align: center;
   opacity: .55;
