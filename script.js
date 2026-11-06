@@ -732,6 +732,12 @@ function closePanel() {
   applyGlow();
 }
 $("panel-close").addEventListener("click", closePanel);
+// Bấm ra ngoài bảng thơ là đóng (không cần bấm ×). Bấm vào một bông hoa thì để hoa đó tự mở bài của nó.
+document.addEventListener("pointerdown", (e) => {
+  if (panel.hidden) return;
+  if (panel.contains(e.target) || e.target.closest(".flower, .card-art")) return;
+  closePanel();
+});
 
 // Hái hoa bỏ vào giỏ
 $("delete-btn").addEventListener("click", () => {
