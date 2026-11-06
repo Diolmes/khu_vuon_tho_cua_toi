@@ -453,7 +453,7 @@ function emitScent(id) {
   const x = clamp(pt.x - w / 2, 8, window.innerWidth - w - 8);
   el.style.setProperty("--sx", x + "px");
   el.style.setProperty("--sy", pt.y - 20 + "px");
-  el.style.setProperty("--drift", rand(-40, 40) + "px");
+  el.style.setProperty("--drift", "0px");          // bay thẳng lên từ bông hoa
   setTimeout(() => el.remove(), 5600);
 }
 
@@ -584,7 +584,7 @@ seedForm.addEventListener("submit", (e) => {
 // Giao diện hạt giống đổi theo vai trò: chủ vườn gieo, khách tặng
 function applyRoleUI() {
   const owner = isOwner();
-  seedToggle.textContent = owner ? "🌱 Hạt giống" : "🎁 Tặng hạt giống cho chủ vườn";
+  seedToggle.textContent = owner ? "🌱 Hạt giống" : "🎁 Tặng hạt giống";
   poemInput.placeholder = owner
     ? "Dán bài thơ vào đây, hoặc thả/dán một tấm ảnh có chữ để web tự đọc..."
     : "Viết hoặc dán bài thơ bạn muốn tặng chủ vườn...";

@@ -489,9 +489,9 @@ body.mode-fert #bin { animation: pulse 1s ease-in-out infinite; border-style: so
   white-space: nowrap;
   font-style: italic;
   font-size: 1.05rem;
-  color: #d4a017;
-  font-weight: bold;
-  text-shadow: 0 0 5px #fff, 0 0 10px #fff6c8, 0 0 14px rgba(255, 214, 90, .8);
+  color: #b8860b;
+  font-weight: 300;
+  text-shadow: 0 0 4px #fff, 0 0 9px rgba(255, 246, 200, .9);
   animation: scentRise 5.4s ease-out forwards;
 }
 .scent span {
@@ -557,6 +557,12 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 #bin { right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); }
 #net { right: calc(116px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); }
 #toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+/* màn hình vừa: thanh công cụ dài hơn tiêu đề thì xuống ngay dưới tiêu đề, khỏi đè lên nhau */
+@media (min-width: 901px) and (max-width: 1560px) {
+  #toolbar { top: calc(58px + env(safe-area-inset-top)); left: 0; right: 0; justify-content: center; flex-wrap: wrap; gap: 6px; }
+  #mode-banner { top: calc(104px + env(safe-area-inset-top)); }
+}
 
 /* màn hình rất lớn */
 @media (min-width: 1600px) {
