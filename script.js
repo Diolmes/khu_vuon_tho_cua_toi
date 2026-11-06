@@ -1574,10 +1574,12 @@ function touchPoem(id) {
   try { db.ref("garden/lastTouch").set({ id, at: SV.TIMESTAMP }); } catch {}
 }
 
-let btfRunning = false;
-async function runButterfly(poemId, seedId = "") {
-  if (btfRunning) return;
-  btfRunning = true;
+const BTF_MAX = 3;            // tối đa 3 con bướm trong vườn cùng lúc
+const BTF_LIFE = 36000;       // một chuyến bay dài tối đa chừng này mili giây (quá hạn thì coi như đã bay đi)
+const btfActive = new Set();
+async function runButterfly(poemId, seedId = "", owned = false) {
+  if (btfActive.has(seedId)) return;
+  btfActive.add(seedId);
   const el = document.createElement("div");
   el.className = "bf";
   el.innerHTML = BTF_SVG;
@@ -1586,7 +1588,9 @@ async function runButterfly(poemId, seedId = "") {
   el.style.setProperty("--bw2", c2);
   $("bee-layer").appendChild(el);
   const vw = window.innerWidth, vh = window.innerHeight;
-  const pos = { x: -50, y: vh * 0.45, dir: 1, t: 0 };
+  const pos = { x: -50, y: vh * rand(0.35, 0.55), dir: 1, t: 0 };
+  const spin = Math.random() < 0.5 ? 1 : -1;                  // mỗi con lượn theo một chiều
+  const off = { x: rand(-14, 14), y: rand(-3, 3) };           // đậu lệch nhau chút nếu cùng một bài
   const place = (x, y) => {
     if (Math.abs(x - pos.x) > 0.3) pos.dir = x > pos.x ? 1 : -1;
     pos.x = x; pos.y = y; pos.t += 0.016;
@@ -1603,10 +1607,11 @@ async function runButterfly(poemId, seedId = "") {
   };
   // bay một vòng elip: bắt đầu từ góc `a0` (0 = bên phải, π/2 = phía dưới, π = bên trái)
   const orbit = async (cx, cy, rx, ry, a0, ms) => {
+    rx *= rand(0.85, 1.15); ry *= rand(0.85, 1.15);
     const at = (a) => ({ x: clamp(cx + Math.cos(a) * rx, 24, window.innerWidth - 24), y: Math.max(70, cy + Math.sin(a) * ry) });
     const s = at(a0);
     if (Math.hypot(s.x - pos.x, s.y - pos.y) > 8) await flyTo(s.x, s.y);
-    await animate(ms, (u) => { const p = at(a0 + u * Math.PI * 2); place(p.x, p.y); });
+    await animate(ms, (u) => { const p = at(a0 + spin * u * Math.PI * 2); place(p.x, p.y); });
   };
 
   try {
@@ -1615,12 +1620,12 @@ async function runButterfly(poemId, seedId = "") {
     // 2) đậu lên bài thơ
     let h = headPoint(poemId);
     if (h) {
-      await flyTo(h.x, h.y - 6);
+      await flyTo(h.x + off.x, h.y - 6 + off.y);
       el.classList.add("landed");
       emitScent(poemId);
       await animate(8500, (u) => {
         const n = headPoint(poemId);
-        if (n) { h = n; place(n.x + Math.sin(u * 40) * 1.2, n.y - 6); }
+        if (n) { h = n; place(n.x + off.x + Math.sin(u * 40) * 1.2, n.y - 6 + off.y); }
       });
       el.classList.remove("landed");
       // 3) cất cánh, bay thêm một vòng quanh bông hoa
@@ -1630,24 +1635,40 @@ async function runButterfly(poemId, seedId = "") {
     await flyTo(window.innerWidth + 60, pos.y - 90);
   } finally {
     el.remove();
-    btfRunning = false;
+    btfActive.delete(seedId);
+    if (owned) { try { db.ref("garden/butterfly/" + seedId).remove(); } catch {} }     // bay đi rồi: trả chỗ cho con khác
   }
 }
 
-// Bướm mỗi ngày bay một lần (cả vườn dùng chung một lượt)
-let btfSeen = null;
+// Gọi bướm: tối đa 3 con cùng lúc (đủ thì phải đợi một con bay đi), không giới hạn số lượt.
+// Chủ vườn bấm quá 5 lần trong 1 phút thì bướm "mệt".
+let btfSeen = new Set();
+const btfPress = [];
 async function claimButterfly(manual) {
-  if (manual && !isOwner()) return false;
+  if (manual) {
+    if (!isOwner()) return false;
+    const now = Date.now();
+    while (btfPress.length && now - btfPress[0] > 60000) btfPress.shift();
+    btfPress.push(now);
+    if (btfPress.length > 5) { toast("Bướm bay nhiều cũng biết mệt chứ bồ 🦋"); return false; }
+  }
   const target = pickButterflyTarget();
   if (!target) { if (manual) toast("Vườn chưa có bông hoa nào để bướm đậu."); return false; }
-  const today = dayKey(), myId = newId();
-  btfSeen = myId;
+  const myId = newId();
+  btfSeen.add(myId);
   const res = await db.ref("garden/butterfly").transaction((cur) => {
-    if (cur && cur.lastDay === today) return undefined;
-    return { lastDay: today, at: Date.now(), id: myId, poem: target, by: ME.uid };
+    const now = Date.now(), flying = {};
+    let n = 0;
+    for (const k in cur || {}) {
+      const v = cur[k];
+      if (v && typeof v === "object" && v.poem && now - v.at < BTF_LIFE) { flying[k] = v; n++; }
+    }
+    if (n >= BTF_MAX) return undefined;
+    flying[myId] = { at: now, poem: target, by: ME.uid };
+    return flying;
   });
-  if (!res.committed) { if (manual) toast("Hôm nay bướm đã bay rồi, mai nhé 🦋"); return false; }
-  runButterfly(target, myId);
+  if (!res.committed) { if (manual) toast(`Vườn đã có đủ ${BTF_MAX} con bướm rồi, đợi một con bay đi nhé 🦋`); return false; }
+  runButterfly(target, myId, true);
   return true;
 }
 
@@ -1787,9 +1808,9 @@ function attachSync() {
     if (v && v.id && v.id !== beeSeen && Date.now() - v.at < 45000) { beeSeen = v.id; runPollination(v.mom, v.dad, false); }
   });
   listen(db.ref("garden/lastTouch"), "value", (s) => { state.touch = s.val(); });
-  listen(db.ref("garden/butterfly"), "value", (s) => {
+  listen(db.ref("garden/butterfly"), "child_added", (s) => {      // có con bướm mới: ai trong vườn cũng thấy
     const v = s.val();
-    if (v && v.id && v.id !== btfSeen && Date.now() - v.at < 45000) { btfSeen = v.id; runButterfly(v.poem, v.id); }
+    if (v && v.poem && !btfSeen.has(s.key) && Date.now() - v.at < 12000) { btfSeen.add(s.key); runButterfly(v.poem, s.key); }
   });
   // hộp hạt giống tặng: chỉ chủ vườn đọc được (luật máy chủ cũng chặn khách)
   if (isOwner()) listen(db.ref("gifts"), "value", (s) => { state.gifts = s.val() || {}; updateGiftsCount(); });
