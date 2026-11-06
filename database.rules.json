@@ -1,0 +1,32 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "garden": {
+      ".read": "auth != null",
+
+      "poems": {
+        "$id": {
+          ".write": "auth != null && (data.exists() || auth.token.email == 'chu-vuon@khuvuontho.app' || newData.child('hybrid').val() == true)"
+        }
+      },
+      "fallen":   { ".write": "auth != null" },
+      "compost":  { ".write": "auth != null", ".validate": "newData.isNumber() && newData.val() >= 0" },
+      "plan":     { ".write": "auth != null" },
+      "rainNow":  { ".write": "auth != null" },
+      "bee":      { ".write": "auth != null" },
+      "seedbag":  { ".write": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'" }
+    },
+
+    "presence": {
+      ".read": "auth != null",
+      "$uid": { ".write": "auth != null && auth.uid == $uid" }
+    },
+
+    "visits": {
+      ".read": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'",
+      "$key": { ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)" }
+    }
+  }
+}

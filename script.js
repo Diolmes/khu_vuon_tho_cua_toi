@@ -13,11 +13,12 @@ const poemMeta = $("poem-meta");
 const wordInfo = $("word-info");
 const binEl = $("bin");
 
-// Khách (mở qua http/https, ví dụ GitHub Pages): chỉ xem vườn của chủ vườn trong garden.json,
-// được vợt chữ / bón phân / gọi mưa nhưng không gieo hạt, hái hoa, thụ phấn, và không lưu gì.
-// Chủ vườn mở file trực tiếp (file://) hoặc thêm ?owner vào địa chỉ để sửa vườn.
-const GUEST = location.protocol !== "file:" && !new URLSearchParams(location.search).has("owner");
-if (GUEST) document.body.classList.add("guest");
+// Vai trò sau khi đăng nhập: "owner" (chủ vườn) hoặc "guest" (khách).
+// Khách làm được mọi thứ trừ gieo hạt và cho ong thụ phấn.
+let ROLE = null;      // "owner" | "guest"
+let ME = null;        // { uid, name }
+let db = null, auth = null, SV = null, OWNER_MAIL = "", BACKEND_MODE = "mock";
+const isOwner = () => ROLE === "owner";
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -34,10 +35,12 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
     status: "garden" | "basket",
     missing: ["0:3", ...]   // chữ đã rơi: "bài:vị trí chữ"
   }
-  fallen = [{ id, word, flowerId, key, x, b }]   // chữ đang nằm dưới đất
-  compost = số phần phân bón
+  fallen = [{ id, word, flowerId, key, x, b, t }]   // chữ đang nằm dưới đất
+  compost = số cục phân bón trong thùng
+  Tất cả được đồng bộ từ máy chủ (db: garden/poems, garden/fallen, garden/compost);
+  riêng "net" (số chữ đang nằm trong vợt) lưu trên máy của từng người.
 */
-let state;              // nạp sau khi FLOWERS được khai báo (xem bên dưới)
+let state;              // bản sao dữ liệu vườn, cập nhật qua các listener của máy chủ
 let openId = null;      // bài thơ đang mở
 let pickedWord = null;  // từ đang được chọn
 let mode = null;        // {type:"place", id} | {type:"fert"}
@@ -259,14 +262,23 @@ function flowerSVG(p, droop = false) {
   return `<svg viewBox="${p.hybrid ? "0 0 150 150" : "0 0 100 150"}">${inner}</svg>`;
 }
 
-// ---------- Lưu trữ ----------
-state = load();
+// ---------- Dữ liệu ----------
+const NET_KEY = "khuVuonVot";
+function loadNet() { try { return parseInt(localStorage.getItem(NET_KEY), 10) || 0; } catch { return 0; } }
+function saveNet() { try { localStorage.setItem(NET_KEY, String(state.net)); } catch {} }
 
+state = { poems: [], fallen: [], compost: 0, net: loadNet(), bag: [], order: null, last: null };
+
+const toArr = (v) => Array.isArray(v) ? v
+  : v && typeof v === "object" ? Object.keys(v).sort((a, b) => a - b).map((k) => v[k]) : [];
+const validType = (t) => (FLOWERS[t] ? t : 0);
+
+// dạng cũ / dạng nhập từ file
 function normPoem(p) {
   return {
     id: p.id,
     texts: p.texts || [p.text || ""],
-    types: (p.types || [p.type || 0]).map((t) => (FLOWERS[t] ? t : 0)),
+    types: (p.types || [p.type || 0]).map(validType),
     hybrid: !!p.hybrid,
     parents: p.parents || null,
     x: p.x ?? 0.5,
@@ -275,24 +287,40 @@ function normPoem(p) {
     missing: p.missing || [],
   };
 }
+function poemFromDb(id, d) {
+  return {
+    id,
+    texts: toArr(d.texts).map(String),
+    types: toArr(d.types).map(validType),
+    hybrid: !!d.hybrid,
+    parents: d.parents ? toArr(d.parents) : null,
+    x: d.x ?? 0.5,
+    y: d.y ?? 0.5,
+    status: d.status || "garden",
+    missing: Object.keys(d.missing || {}),
+    t: d.t || 0,
+  };
+}
+function poemToDb(p) {
+  const o = { texts: p.texts, types: p.types, hybrid: !!p.hybrid, x: p.x, y: p.y, status: p.status || "garden", t: Date.now() };
+  if (p.parents) o.parents = p.parents;
+  if (p.missing && p.missing.length) { o.missing = {}; p.missing.forEach((k) => { o.missing[k] = true; }); }
+  return o;
+}
 
-function load() {
-  let raw = null;
-  if (!GUEST) { try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch {} }
-  const s = Array.isArray(raw) ? { poems: raw } : (raw || {}); // bản cũ chỉ lưu mảng bài thơ
-  s.poems = (s.poems || []).map(normPoem);
-  s.fallen = s.fallen || [];
-  s.compost = s.compost || 0;   // số cục phân bón trong thùng
-  s.net = s.net || 0;           // số chữ đang nằm trong vợt
-  s.bag = s.bag || [];          // các kiểu hoa chưa dùng trong vòng hiện tại
-  s.order = s.order || null;    // thứ tự của vòng hiện tại
-  s.last = s.last ?? null;      // kiểu hoa vừa gieo
-  s.rain = s.rain || null;      // {day, at, done}: mưa một lần mỗi ngày
-  return s;
+// Vườn cũ lưu trong trình duyệt (trước khi có máy chủ) để chuyển lên mạng
+function readLegacy() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!raw) return null;
+    const o = Array.isArray(raw) ? { poems: raw } : raw;
+    const poems = (o.poems || []).map(normPoem);
+    return poems.length ? { poems, fallen: o.fallen || [], compost: o.compost || 0 } : null;
+  } catch { return null; }
 }
 
 // Chọn kiểu hoa cho hạt mới: dùng hết 50 mẫu rồi mới xáo lại (thứ tự khác vòng trước),
-// và không bao giờ để hai bông giống nhau mọc liên tiếp.
+// và không bao giờ để hai bông giống nhau mọc liên tiếp. Trạng thái được lưu trên máy chủ.
 function nextType() {
   if (!state.bag.length) {
     const ids = FLOWERS.map((_, i) => i);
@@ -306,11 +334,8 @@ function nextType() {
   }
   const t = state.bag.shift();
   state.last = t;
+  db.ref("garden/seedbag").set({ bag: state.bag, order: state.order, last: t });
   return t;
-}
-function save() {
-  if (GUEST) return;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
 }
 const getPoem = (id) => state.poems.find((p) => p.id === id);
 const flowerEl = (id) => gardenEl.querySelector(`.flower[data-id="${id}"]`);
@@ -465,14 +490,12 @@ gardenEl.addEventListener("click", (e) => {
   setMode(null);
   if (!p) return;
   const vh = window.innerHeight;
-  p.x = clamp(e.clientX / window.innerWidth, 0.04, 0.96);
-  p.y = clamp((vh - e.clientY - 10) / (vh * 0.42), 0, 1);
-  p.status = "garden";
-  save();
-  renderFlower(p, true);
-  updateBasketCount();
-  refreshHint();
-  applyGlow();
+  db.ref("garden/poems/" + p.id).update({
+    x: clamp(e.clientX / window.innerWidth, 0.04, 0.96),
+    y: clamp((vh - e.clientY - 10) / (vh * 0.42), 0, 1),
+    status: "garden",
+    t: Date.now(),
+  });
   toast("Đã trồng lại bông hoa 🌷");
 }, true);
 
@@ -486,6 +509,7 @@ seedToggle.addEventListener("click", () => {
 
 seedForm.addEventListener("submit", (e) => {
   e.preventDefault();
+  if (!isOwner()) return;
   const text = poemInput.value.trim();
   if (!text) return;
 
@@ -499,9 +523,11 @@ seedForm.addEventListener("submit", (e) => {
     y: Math.random(),
     status: "garden",
     missing: [],
+    t: Date.now(),
   };
+  holdRender.add(p.id);               // hạt rơi xong mới cho hoa nở
   state.poems.push(p);
-  save();
+  db.ref("garden/poems/" + p.id).set(poemToDb(p));
   poemInput.value = "";
   seedForm.hidden = true;
   seedToggle.setAttribute("aria-expanded", false);
@@ -513,11 +539,65 @@ seedForm.addEventListener("submit", (e) => {
   seed.style.left = p.x * 100 + "%";
   seed.style.bottom = 10 + p.y * (window.innerHeight * 0.42) + "px";
   gardenEl.appendChild(seed);
-  seed.addEventListener("animationend", () => {
+  let bloomed = false;
+  const bloomNow = () => {          // chạy khi hạt rơi xong, hoặc sau 1,3 giây nếu trình duyệt không chạy hoạt ảnh (tab nền)
+    if (bloomed) return;
+    bloomed = true;
     seed.remove();
-    renderFlower(p, true);
+    holdRender.delete(p.id);
+    if (!flowerEl(p.id) && getPoem(p.id)?.status === "garden") renderFlower(getPoem(p.id), true);
     applyGlow();
-  });
+  };
+  seed.addEventListener("animationend", bloomNow);
+  setTimeout(bloomNow, 1300);
+});
+
+// ---------- Đọc chữ từ ảnh (OCR, chạy ngay trong trình duyệt bằng Tesseract.js, tiếng Việt) ----------
+let tessLoading = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve();
+  if (!tessLoading) tessLoading = loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+  return tessLoading;
+}
+let ocrBusy = false;
+async function readImageText(file) {
+  if (ocrBusy || !file) return;
+  const status = $("ocr-status");
+  if (!file.type.startsWith("image/")) { status.hidden = false; status.textContent = "Đây không phải file ảnh."; return; }
+  ocrBusy = true;
+  status.hidden = false;
+  status.textContent = "Đang tải bộ đọc chữ… (lần đầu hơi lâu)";
+  try {
+    await loadTesseract();
+    const res = await Tesseract.recognize(file, "vie", {
+      logger: (m) => {
+        if (m.status === "recognizing text") status.textContent = `Đang đọc chữ… ${Math.round(m.progress * 100)}%`;
+        else if (m.status) status.textContent = "Đang chuẩn bị…";
+      },
+    });
+    const text = (res.data.text || "").replace(/\r/g, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (!text) { status.textContent = "Không đọc được chữ nào trong ảnh. Thử ảnh rõ và thẳng hơn nhé."; return; }
+    const cur = poemInput.value.trim();
+    poemInput.value = cur ? cur + "\n\n" + text : text;
+    status.textContent = "Đã đọc xong. Kiểm tra lại chữ rồi bấm Gieo hạt nhé.";
+  } catch (err) {
+    status.textContent = "Không đọc được ảnh: " + (err.message || err);
+  } finally {
+    ocrBusy = false;
+  }
+}
+$("poem-image").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; readImageText(f); });
+poemInput.addEventListener("paste", (e) => {                       // dán ảnh từ clipboard
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+  if (item) { e.preventDefault(); readImageText(item.getAsFile()); }
+});
+seedForm.addEventListener("dragover", (e) => { e.preventDefault(); seedForm.classList.add("dragover"); });
+seedForm.addEventListener("dragleave", () => seedForm.classList.remove("dragover"));
+seedForm.addEventListener("drop", (e) => {                         // thả ảnh vào form
+  e.preventDefault();
+  seedForm.classList.remove("dragover");
+  const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith("image/"));
+  if (f) readImageText(f);
 });
 
 // ---------- Mở bài thơ ----------
@@ -578,12 +658,8 @@ $("panel-close").addEventListener("click", closePanel);
 $("delete-btn").addEventListener("click", () => {
   const p = getPoem(openId);
   if (!p) return;
-  p.status = "basket";
-  save();
-  flowerEl(p.id)?.remove();
+  db.ref("garden/poems/" + p.id).update({ status: "basket", t: Date.now() });
   closePanel();
-  updateBasketCount();
-  refreshHint();
   toast("Đã hái bông hoa bỏ vào giỏ 🧺");
 });
 
@@ -678,15 +754,34 @@ function buildCard(p) {
   });
   const gift = document.createElement("button");
   gift.textContent = "🎁 Tặng";
-  gift.addEventListener("click", () => giftPoem(p));
+  gift.addEventListener("click", () => askGift(p));
   actions.append(replant, gift);
   card.appendChild(actions);
   return card;
 }
 
+// Hộp thoại "ô ghi tên": ghi tên người nhận (hoặc bỏ qua) rồi mới tặng
+let giftTarget = null;
+function askGift(p) {
+  giftTarget = p;
+  $("gift-name").value = "";
+  $("gift-overlay").hidden = false;
+  setTimeout(() => $("gift-name").focus(), 50);
+}
+function closeGift() { $("gift-overlay").hidden = true; giftTarget = null; }
+$("gift-box").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const p = giftTarget, to = $("gift-name").value.trim().replace(/\s+/g, " ");
+  closeGift();
+  if (p) giftPoem(p, to);
+});
+$("gift-skip").addEventListener("click", () => { const p = giftTarget; closeGift(); if (p) giftPoem(p, ""); });
+$("gift-cancel").addEventListener("click", closeGift);
+$("gift-overlay").addEventListener("click", (e) => { if (e.target === $("gift-overlay")) closeGift(); });
+
 // Tặng = vẽ thẻ hoa thành ảnh PNG, chép vào clipboard (nếu trình duyệt không cho thì tải ảnh về), rồi bỏ khỏi giỏ
-async function giftPoem(p) {
-  const blobPromise = renderCardPNG(p);
+async function giftPoem(p, to = "") {
+  const blobPromise = renderCardPNG(p, to);
   let how = null;
   try {
     // đưa promise vào ClipboardItem để vẫn tính là thao tác bấm của người dùng
@@ -706,10 +801,7 @@ async function giftPoem(p) {
     } catch {}
   }
   if (!how) { toast("Không tạo được ảnh, bông hoa vẫn còn trong giỏ."); return; }
-  state.poems = state.poems.filter((q) => q.id !== p.id);
-  save();
-  renderBasket();
-  updateBasketCount();
+  db.ref("garden/poems/" + p.id).remove();
   toast(how === "clipboard"
     ? "Đã chép ảnh bông hoa vào clipboard. Dán gửi cho người ấy nhé 🎁"
     : "Trình duyệt không cho chép vào clipboard nên ảnh đã được tải về máy 🎁");
@@ -768,11 +860,11 @@ function drawPoemPatch(ctx, text, cx, cy, w, h, maxFont) {
   lines.forEach((l, i) => ctx.fillText(l, cx, top + i * lh));
 }
 
-// Vẽ một bông hoa to (đầu hoa chiếm ~88% bề rộng ảnh), bài thơ nằm trọn trong đầu hoa
+// Vẽ một bông hoa (đầu hoa chiếm ~72% bề rộng), bài thơ nằm trọn trong đầu hoa
 async function drawBloomImage(ctx, bt, ht, text, ox, W, H) {
   const info = FLOWERS[ht].info;
-  const vw = Math.max(info.w, 44) / 0.88, vh = (vw * H) / W;
-  const vx = info.c[0] - vw / 2, vy = info.c[1] - vh * 0.36;
+  const vw = Math.max(info.w, 46) / 0.66, vh = (vw * H) / W;
+  const vx = info.c[0] - vw / 2, vy = info.c[1] - vh * 0.43;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${vx} ${vy} ${vw} ${vh}">${bloom(bt, ht)}</svg>`;
   const img = new Image();
   await new Promise((res, rej) => {
@@ -783,17 +875,20 @@ async function drawBloomImage(ctx, bt, ht, text, ox, W, H) {
   ctx.drawImage(img, ox, 0, W, H);
   const k = W / vw;
   const [bx, by, bw, bh] = info.box;
-  drawPoemPatch(ctx, text, ox + (bx - vx) * k, (by - vy) * k, bw * 2 * k, bh * 2 * k, 56);
+  drawPoemPatch(ctx, text, ox + (bx - vx) * k, (by - vy) * k, bw * 2 * k, bh * 2 * k, Math.round(W * 0.042));
 }
 
-async function renderCardPNG(p) {
-  const W = 1000, H = 1250;
+async function renderCardPNG(p, to = "") {
+  const W = 720, H = 920;                       // mỗi bông một khung; hoa lai có hai khung cạnh nhau
+  const total = W * (p.hybrid ? 2 : 1);
   const canvas = document.createElement("canvas");
-  canvas.width = W * (p.hybrid ? 2 : 1);
+  canvas.width = total;
   canvas.height = H;
   const ctx = canvas.getContext("2d");
+
+  // giấy kem
   ctx.fillStyle = "#fff7e8";
-  ctx.fillRect(0, 0, canvas.width, H);
+  ctx.fillRect(0, 0, total, H);
 
   if (p.hybrid) {
     const [a, b] = p.types;
@@ -802,12 +897,77 @@ async function renderCardPNG(p) {
   } else {
     await drawBloomImage(ctx, p.types[0], p.types[0], p.texts[0], 0, W, H);
   }
+
+  // dải giấy ở chân và đầu ảnh để chữ không đè lên hoa, rồi khung mảnh
+  ctx.fillStyle = "#fff7e8";
+  ctx.fillRect(0, H * 0.9, total, H * 0.1);
+  if (to) ctx.fillRect(0, 0, total, H * 0.11);
+  ctx.strokeStyle = "#e6d3b0";
+  ctx.lineWidth = 3;
+  roundRectPath(ctx, 18, 18, total - 36, H - 36, 26);
+  ctx.stroke();
+
+  // dòng "tặng ai" ở trên
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (to) {
+    ctx.fillStyle = "#8a6a4f";
+    ctx.font = `italic ${Math.round(H * 0.034)}px Georgia, "Times New Roman", serif`;
+    ctx.fillText(`gửi ${to}`, total / 2, H * 0.068);
+  }
+  // thẻ ghi nguồn + năm ở dưới
+  ctx.fillStyle = "#a28a70";
+  ctx.font = `italic ${Math.round(H * 0.026)}px Georgia, "Times New Roman", serif`;
+  ctx.fillText(`hoa từ khu vườn thơ của tôi - diolmes ${new Date().getFullYear()}`, total / 2, H * 0.947);
+
   return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/png"));
 }
 
 $("basket-btn").addEventListener("click", openBasket);
 $("basket-close").addEventListener("click", closeBasket);
 $("basket-overlay").addEventListener("click", (e) => { if (e.target === $("basket-overlay")) closeBasket(); });
+
+// ---------- Cảnh vườn: đường đi + cỏ ----------
+(function makeScenery() {
+  const ground = $("ground");
+  // đường đất uốn lượn từ dưới lên chân trời (thu nhỏ dần cho có chiều sâu)
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "path");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.innerHTML = `
+    <path d="M40 100 C42 82 58 74 54 58 C51 46 44 40 49 26 C51 20 53 14 53.5 8 L55.5 8 C56 14 59 22 58 28 C56 42 70 48 70 62 C70 78 62 88 66 100 Z" fill="#e8d3a2"/>
+    <path d="M40 100 C42 82 58 74 54 58 C51 46 44 40 49 26 C51 20 53 14 53.5 8" fill="none" stroke="#d4bb82" stroke-width=".7" stroke-linecap="round"/>
+    <path d="M66 100 C62 88 70 78 70 62 C70 48 56 42 58 28 C59 22 56 14 55.5 8" fill="none" stroke="#d4bb82" stroke-width=".7" stroke-linecap="round"/>
+    <g fill="#c9b283">
+      <ellipse cx="52" cy="90" rx="1.6" ry=".9"/><ellipse cx="58" cy="82" rx="1.2" ry=".7"/>
+      <ellipse cx="55" cy="68" rx="1" ry=".6"/><ellipse cx="62" cy="58" rx="1" ry=".55"/>
+      <ellipse cx="52" cy="46" rx=".8" ry=".45"/><ellipse cx="53" cy="30" rx=".6" ry=".35"/>
+    </g>`;
+  ground.appendChild(svg);
+
+  // cỏ rải rác (tránh lòng đường)
+  const blade = (c) => `<svg viewBox="0 0 26 20"><path d="M3 20 Q4 8 1 3 Q7 8 9 20 M10 20 Q11 5 12 0 Q17 7 16 20 M17 20 Q19 9 24 4 Q22 12 23 20" fill="${c}"/></svg>`;
+  const greens = ["#8fb96a", "#7aa85a", "#a3c97c", "#6f9c52"];
+  for (let i = 0; i < 46; i++) {
+    const y = rand(10, 98);                       // % chiều cao vùng đất
+    const roadL = 40 + (60 - 40) * 0, roadR = 70;  // xấp xỉ bề ngang đường, hẹp dần lên trên
+    const t = y / 100;
+    const cx = 54 + (1 - t) * 4, half = 3 + t * 11;
+    let x = rand(2, 98);
+    if (Math.abs(x - cx) < half + 2) x = x < cx ? rand(2, Math.max(3, cx - half - 2)) : rand(Math.min(97, cx + half + 2), 98);
+    const el = document.createElement("div");
+    el.className = "tuft";
+    el.style.left = x + "%";
+    el.style.top = y + "%";
+    const sc = 0.55 + t * 0.9;
+    el.style.width = 26 * sc + "px";
+    el.style.height = 20 * sc + "px";
+    el.innerHTML = blade(greens[i % greens.length]);
+    ground.appendChild(el);
+  }
+})();
 
 // ---------- Mây ----------
 (function makeClouds() {
@@ -829,7 +989,7 @@ $("basket-overlay").addEventListener("click", (e) => { if (e.target === $("baske
 
 // ---------- Mưa + chữ rơi ----------
 let raining = false;
-function startRain() {
+function startRain(execute = false) {
   if (raining) return;
   raining = true;
   document.body.classList.add("raining");
@@ -844,7 +1004,7 @@ function startRain() {
     rain.appendChild(d);
   }
   rain.classList.add("on");
-  setTimeout(dropWords, 3000);
+  if (execute) setTimeout(dropWords, 3000);   // chỉ máy khởi động cơn mưa mới làm rụng chữ
   setTimeout(stopRain, 10000);
 }
 function stopRain() {
@@ -876,25 +1036,20 @@ function loseWords(id) {
     if (!isMissing(p, pi, ti) && normalize(w)) slots.push({ key: pi + ":" + ti, word: w });
   }));
   const take = shuffle(slots).slice(0, Math.min(room, 1 + Math.floor(Math.random() * 2)));
-  const from = headPoint(id);
+  const vh = window.innerHeight;
+  const upd = {};
   take.forEach((s) => {
-    p.missing.push(s.key);
-    const vh = window.innerHeight;
-    const f = {
-      id: newId(),
+    upd[`poems/${id}/missing/${s.key}`] = true;
+    upd[`fallen/${newId()}`] = {
       word: s.word,
       flowerId: id,
       key: s.key,
       x: clamp(p.x + rand(-0.05, 0.05), 0.03, 0.97),
       b: clamp(10 + p.y * vh * 0.42 + rand(-24, 24), 10, 10 + vh * 0.42),
+      t: Date.now(),
     };
-    state.fallen.push(f);
-    renderFallen(f, from);
   });
-  const el = flowerEl(id);
-  if (el) updateDroop(el, p);
-  if (openId === id) { renderPoem(p); applyGlow(); }
-  save();
+  db.ref("garden").update(upd);
 }
 
 function renderFallen(f, from) {
@@ -933,8 +1088,7 @@ function updateNet() {
 // n chữ biến thành n cục phân bón
 function addCompost(n) {
   const first = state.compost === 0;
-  state.compost += n;
-  updateBin();
+  db.ref("garden/compost").transaction((c) => (c || 0) + n);
   binEl.classList.remove("plop"); binEl.offsetHeight; binEl.classList.add("plop");
   if (first) toast("Chữ đã thành phân bón. Kéo cục phân từ thùng ra thả vào bông hoa ngoẹo đầu 🌿");
 }
@@ -961,8 +1115,8 @@ function startDrag(e) {
     el.classList.remove("dragging");
     binEl.classList.remove("hot");
     if (overBin(ev)) {
-      state.fallen = state.fallen.filter((x) => x.id !== f.id);
       el.remove();
+      db.ref("garden/fallen/" + f.id).remove();
       addCompost(1);
     } else {
       const vh = window.innerHeight;
@@ -970,8 +1124,8 @@ function startDrag(e) {
       f.b = clamp(vh - ev.clientY - 10, 10, 10 + vh * 0.42);
       el.style.left = f.x * 100 + "%";
       el.style.bottom = f.b + "px";
+      db.ref("garden/fallen/" + f.id).update({ x: f.x, b: f.b });
     }
-    save();
   };
   el.addEventListener("pointermove", move);
   el.addEventListener("pointerup", up);
@@ -988,17 +1142,17 @@ const netScale = () => netEl.getBoundingClientRect().width / 70;
 function scoopAt(hx, hy) {
   let got = 0;
   const k = netScale();
-  gardenEl.querySelectorAll(".fallen").forEach((el) => {
+  gardenEl.querySelectorAll(".fallen:not(.scooped)").forEach((el) => {
     const r = el.getBoundingClientRect();
     const d = Math.hypot(r.left + r.width / 2 - hx, r.top + r.height / 2 - hy);
     if (d > (HOOP.r + 14) * k) return;
-    state.fallen = state.fallen.filter((f) => f.id !== el.dataset.id);
+    db.ref("garden/fallen/" + el.dataset.id).remove();
     el.style.pointerEvents = "none";
     el.classList.add("scooped");
     setTimeout(() => el.remove(), 300);
     got++;
   });
-  if (got) { state.net += got; updateNet(); }
+  if (got) { state.net += got; updateNet(); saveNet(); }
 }
 
 netEl.addEventListener("pointerdown", (e) => {
@@ -1036,13 +1190,13 @@ netEl.addEventListener("pointerdown", (e) => {
       const n = state.net;
       state.net = 0;
       updateNet();
+      saveNet();
       addCompost(n);
       toast(`Đã đổ ${n} chữ vào thùng phân hữu cơ.`);
     } else if (!moved) {
       toast("Kéo vợt quét qua các chữ rơi, rồi kéo vợt tới thùng phân để đổ.");
     }
     netEl.style.left = netEl.style.top = netEl.style.right = netEl.style.bottom = "";   // về chỗ cũ
-    save();
   };
   netEl.addEventListener("pointermove", move);
   netEl.addEventListener("pointerup", up);
@@ -1124,23 +1278,16 @@ binEl.addEventListener("pointerdown", (e) => {
 });
 
 // Mỗi bông hoa chỉ cần bón một cục phân là khỏe hẳn: thân thẳng lại, các chữ rơi trở về
-function fertilize(id) {
+async function fertilize(id) {
   const p = getPoem(id);
-  if (!p || !p.missing.length || state.compost <= 0) return;
-  state.compost--;
-  p.missing = [];
-  state.fallen = state.fallen.filter((f) => {
-    if (f.flowerId !== id) return true;
-    gardenEl.querySelector(`.fallen[data-id="${f.id}"]`)?.remove();
-    return false;
-  });
-  const el = flowerEl(id);
-  if (el) updateDroop(el, p);
+  if (!p || !p.missing.length) return;
+  const res = await db.ref("garden/compost").transaction((c) => ((c || 0) > 0 ? c - 1 : undefined));
+  if (!res.committed) { toast("Thùng phân đang trống."); return; }
+  const upd = { [`poems/${id}/missing`]: null };
+  state.fallen.filter((f) => f.flowerId === id).forEach((f) => { upd[`fallen/${f.id}`] = null; });
+  db.ref("garden").update(upd);
   const pt = headPoint(id);
   if (pt) { puff(pt, "🌿"); puff(pt, "✨"); }
-  if (openId === id) { renderPoem(p); applyGlow(); }
-  updateBin();
-  save();
   toast("Bông hoa đã đứng thẳng lại 🌼");
 }
 
@@ -1209,6 +1356,7 @@ let lastT = performance.now();
 })(lastT);
 
 const alive = (id) => { const p = getPoem(id); return !!p && p.status === "garden" && !p.hybrid; };
+const dayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
 
 async function visit(bee, id) {
   const pt = headPoint(id);
@@ -1219,15 +1367,8 @@ async function visit(bee, id) {
   return true;
 }
 
-async function pollinate(manual) {
-  if (GUEST) return;
-  const bee = bees.find((b) => !b.busy);
-  if (!bee) return;
-  if (state.poems.filter((p) => p.hybrid).length >= 12) {
-    if (manual) toast("Vườn đã đông hoa lai rồi.");
-    return;
-  }
-  // chỉ hoa thường mới được làm bố mẹ, và mỗi cặp chỉ có một hoa con
+// chỉ hoa thường mới được làm bố mẹ, và mỗi cặp chỉ có một hoa con
+function pickPair() {
   const parents = state.poems.filter((p) => p.status === "garden" && !p.hybrid);
   const pairs = [];
   for (let i = 0; i < parents.length; i++) {
@@ -1237,18 +1378,23 @@ async function pollinate(manual) {
       if (!used) pairs.push([a, b]);
     }
   }
-  if (!pairs.length) {
-    if (manual) toast("Cần ít nhất hai bông hoa thường (chưa có con chung) trong vườn để ong thụ phấn.");
+  if (!pairs.length) return null;
+  const [a, b] = shuffle(pairs)[0];
+  return Math.random() < 0.5 ? [a, b] : [b, a];
+}
+
+// Ong bay đi thăm hai bông hoa. spawn = true: chỉ máy giành được lượt hôm nay mới tạo hoa con.
+async function runPollination(momId, dadId, spawn) {
+  const bee = bees.find((b) => !b.busy);
+  if (!bee) {
+    if (spawn && getPoem(momId) && getPoem(dadId)) spawnChild(getPoem(momId), getPoem(dadId));
     return;
   }
-  const [a, b] = shuffle(pairs)[0];
-  const [mom, dad] = Math.random() < 0.5 ? [a, b] : [b, a];
-
   bee.busy = true;
   try {
-    if (!(await visit(bee, mom.id)) || !alive(mom.id) || !alive(dad.id)) return;
-    if (!(await visit(bee, dad.id)) || !alive(mom.id) || !alive(dad.id)) return;
-    spawnChild(mom, dad);
+    if (!(await visit(bee, momId)) || !alive(momId) || !alive(dadId)) return;
+    if (!(await visit(bee, dadId)) || !alive(momId) || !alive(dadId)) return;
+    if (spawn) spawnChild(getPoem(momId), getPoem(dadId));
   } finally {
     bee.busy = false;
     bee.wait = 0;
@@ -1267,95 +1413,470 @@ function spawnChild(mom, dad) {
     status: "garden",
     missing: [],
   };
-  state.poems.push(child);
-  save();
-  renderFlower(child, true);
-  setTimeout(() => { const pt = headPoint(child.id); if (pt) puff(pt, "✨"); }, 500);
-  applyGlow();
+  db.ref("garden/poems/" + child.id).set(poemToDb(child));
+  setTimeout(() => { const pt = headPoint(child.id); if (pt) puff(pt, "✨"); }, 600);
   toast("Ong vừa thụ phấn: một chùm thơ lai hai bài đã nở 🌸");
 }
 
-$("bee-btn").addEventListener("click", () => pollinate(true));
-$("rain-btn").addEventListener("click", () => {
-  if (raining) { toast("Trời đang mưa rồi."); return; }
-  startRain();
-});
-
-// Mưa ngẫu nhiên đúng 1 lần mỗi ngày (giờ mưa được chọn ngẫu nhiên trong 8h-22h;
-// nếu lúc đó chưa mở trang thì mưa ngay khi bạn ghé vườn lần đầu sau giờ ấy)
-const dayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
-function checkDailyRain() {
+// Ong chỉ đi thụ phấn 1 lần mỗi ngày (cả vườn dùng chung một lượt)
+let beeSeen = null;
+async function claimPollination(manual) {
+  if (manual && !isOwner()) return;                    // khách không được gọi ong
+  if (state.poems.filter((p) => p.hybrid).length >= 12) { if (manual) toast("Vườn đã đông hoa lai rồi."); return false; }
+  const pair = pickPair();
+  if (!pair) {
+    if (manual) toast("Cần ít nhất hai bông hoa thường (chưa có con chung) trong vườn để ong thụ phấn.");
+    return false;
+  }
   const today = dayKey();
-  if (!state.rain || state.rain.day !== today) {
+  const myId = newId();
+  beeSeen = myId;      // đánh dấu trước để máy này không tự chạy lại như người ngoài
+  const res = await db.ref("garden/bee").transaction((cur) => {
+    if (cur && cur.lastDay === today) return undefined;
+    return { lastDay: today, mom: pair[0].id, dad: pair[1].id, at: Date.now(), id: myId, by: ME.uid };
+  });
+  if (!res.committed) {
+    if (manual) toast("Hôm nay ong đã đi thụ phấn rồi, mai nhé 🐝");
+    return false;
+  }
+  runPollination(pair[0].id, pair[1].id, true);
+  return true;
+}
+
+// Mưa: ai bấm ☔ cũng được, nhưng cách nhau ít nhất 20 phút để kịp nhặt chữ
+let rainSeen = null;
+async function triggerRain(manual) {
+  const myId = newId();
+  rainSeen = myId;     // đánh dấu trước, kẻo listener nhìn thấy cơn mưa của chính mình rồi chạy như người ngoài
+  const res = await db.ref("garden/rainNow").transaction((cur) => {
+    const now = Date.now();
+    if (cur && now - cur.at < (manual ? 20 * 60000 : 60000)) return undefined;
+    return { at: now, id: myId, by: ME.uid };
+  });
+  if (!res.committed) { if (manual) toast("Trời vừa mưa xong, chờ một lát rồi hãy gọi mưa nhé ☔"); return; }
+  startRain(true);
+}
+
+// Kế hoạch mỗi ngày: một giờ mưa và một giờ ong thụ phấn, chọn ngẫu nhiên trong 8h-22h
+async function ensurePlan() {
+  const today = dayKey();
+  await db.ref("garden/plan").transaction((cur) => {
+    if (cur && cur.day === today) return undefined;
     const d = new Date();
     const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8, 0).getTime();
     const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 22, 0).getTime();
     const now = Date.now();
-    state.rain = { day: today, at: rand(Math.max(start, now + 30000), Math.max(end, now + 120000)), done: false };
-    save();
+    const pick = () => Math.round(rand(Math.max(start, now + 30000), Math.max(end, now + 120000)));
+    return { day: today, rainAt: pick(), beeAt: pick(), rainDone: false, beeDone: false };
+  });
+}
+async function checkPlans() {
+  if (!db || !ME) return;
+  const pl = state.plan;
+  if (!pl || pl.day !== dayKey()) { await ensurePlan(); return; }
+  const now = Date.now();
+  if (!pl.rainDone && now >= pl.rainAt && !raining) {
+    const r = await db.ref("garden/plan").transaction((cur) => (cur && !cur.rainDone ? { ...cur, rainDone: true } : undefined));
+    if (r.committed) triggerRain(false);
   }
-  if (!state.rain.done && !raining && Date.now() >= state.rain.at) {
-    state.rain.done = true;
-    save();
-    startRain();
+  if (!pl.beeDone && now >= pl.beeAt) {
+    const r = await db.ref("garden/plan").transaction((cur) => (cur && !cur.beeDone ? { ...cur, beeDone: true } : undefined));
+    if (r.committed) claimPollination(false);
   }
 }
-setInterval(checkDailyRain, 20000);
-checkDailyRain();
-(function scheduleBee() {
-  setTimeout(() => { pollinate(false); scheduleBee(); }, rand(45000, 100000));
-})();
 
-// ---------- Phím tắt ----------
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
-  if (!$("basket-overlay").hidden) closeBasket();
-  else if (mode) setMode(null);
-  else if (!panel.hidden) closePanel();
+$("bee-btn").addEventListener("click", () => claimPollination(true));
+$("rain-btn").addEventListener("click", () => {
+  if (raining) { toast("Trời đang mưa rồi."); return; }
+  triggerRain(true);
 });
 
-// ---------- Xuất vườn (chủ vườn) -> garden.json để đăng cho khách xem ----------
-function exportGarden() {
-  const poems = state.poems.filter((p) => p.status === "garden")
-    .map(({ id, texts, types, hybrid, parents, x, y }) => ({ id, texts, types, hybrid, parents, x, y }));
-  const blob = new Blob([JSON.stringify({ version: 1, poems }, null, 2)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "garden.json";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  toast(`Đã xuất ${poems.length} bông hoa ra garden.json. Bỏ file này vào thư mục dự án rồi đăng lên nhé.`);
-}
-$("export-btn").addEventListener("click", exportGarden);
+// ---------- Đồng bộ với máy chủ ----------
+const holdRender = new Set();           // hoa vừa gieo, chờ hạt rơi xong mới nở
+const fallenEl = (id) => gardenEl.querySelector(`.fallen[data-id="${id}"]`);
 
-// ---------- Khởi động ----------
-function init() {
-  state.poems.filter((p) => p.status === "garden").forEach((p) => renderFlower(p, false));
-  state.fallen.forEach((f) => renderFallen(f, null));
-  refreshHint();
+function refreshAfterPoems() {
   updateBasketCount();
-  updateBin();
+  refreshHint();
+  if (!$("basket-overlay").hidden) renderBasket();
+}
+function applyPoem(id, d) {
+  const np = poemFromDb(id, d);
+  let p = getPoem(id);
+  if (p) Object.assign(p, np);
+  else { p = np; state.poems.push(p); }
+  if (p.status === "garden") {
+    if (!holdRender.has(id)) {
+      const el = flowerEl(id);
+      if (!el) { renderFlower(p, Date.now() - (p.t || 0) < 15000); applyGlow(); }
+      else { placeFlower(el, p); updateDroop(el, p); }
+    }
+    if (openId === id) { renderPoem(p); applyGlow(); }
+  } else {
+    flowerEl(id)?.remove();
+    if (openId === id) closePanel();
+  }
+  refreshAfterPoems();
+}
+function removePoem(id) {
+  state.poems = state.poems.filter((p) => p.id !== id);
+  flowerEl(id)?.remove();
+  if (openId === id) closePanel();
+  refreshAfterPoems();
+}
+function onFallenAdded(id, d) {
+  if (state.fallen.some((f) => f.id === id)) return;
+  const f = { id, word: d.word, flowerId: d.flowerId, key: d.key, x: d.x, b: d.b, t: d.t || 0 };
+  state.fallen.push(f);
+  renderFallen(f, Date.now() - f.t < 8000 ? headPoint(f.flowerId) : null);
+}
+function onFallenChanged(id, d) {
+  const f = state.fallen.find((x) => x.id === id);
+  if (!f) return;
+  f.x = d.x; f.b = d.b;
+  const el = fallenEl(id);
+  if (el && !el.classList.contains("dragging")) { el.style.left = f.x * 100 + "%"; el.style.bottom = f.b + "px"; }
+}
+function onFallenRemoved(id) {
+  state.fallen = state.fallen.filter((f) => f.id !== id);
+  const el = fallenEl(id);
+  if (el && !el.classList.contains("scooped")) el.remove();
+}
+
+function attachSync() {
+  const poems = db.ref("garden/poems");
+  poems.on("child_added", (s) => applyPoem(s.key, s.val()));
+  poems.on("child_changed", (s) => applyPoem(s.key, s.val()));
+  poems.on("child_removed", (s) => removePoem(s.key));
+
+  const fallen = db.ref("garden/fallen");
+  fallen.on("child_added", (s) => onFallenAdded(s.key, s.val()));
+  fallen.on("child_changed", (s) => onFallenChanged(s.key, s.val()));
+  fallen.on("child_removed", (s) => onFallenRemoved(s.key));
+
+  db.ref("garden/compost").on("value", (s) => { state.compost = s.val() || 0; updateBin(); });
+  db.ref("garden/seedbag").on("value", (s) => {
+    const v = s.val();
+    state.bag = v ? toArr(v.bag) : [];
+    state.order = v && v.order ? toArr(v.order) : null;
+    state.last = v && v.last !== undefined ? v.last : null;
+  });
+  db.ref("garden/plan").on("value", (s) => { state.plan = s.val(); });
+  db.ref("garden/rainNow").on("value", (s) => {
+    const v = s.val();
+    if (v && v.id !== rainSeen && Date.now() - v.at < 15000) { rainSeen = v.id; startRain(false); }
+  });
+  db.ref("garden/bee").on("value", (s) => {
+    const v = s.val();
+    if (v && v.id && v.id !== beeSeen && Date.now() - v.at < 45000) { beeSeen = v.id; runPollination(v.mom, v.dad, false); }
+  });
+  refreshHint();
   updateNet();
   applyGlow();
 }
 
-async function boot() {
-  if (GUEST) {
-    try {
-      const res = await fetch("garden.json", { cache: "no-cache" });
-      const data = await res.json();
-      state.poems = (data.poems || []).map((p) => ({ ...normPoem(p), status: "garden", missing: [] }));
-    } catch {}
-    if (!state.poems.length) hintEl.textContent = "Khu vườn đang được chuẩn bị, bạn quay lại sau nhé ✿";
-    else hintEl.textContent = "";
-  }
-  init();
+// ---------- Ai đang trong vườn + con trỏ ----------
+const peers = {};            // uid -> {name, role, x, y, t}
+const cursorEls = {};
+const hueOf = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
+function updateWho() {
+  const names = Object.values(peers).map((p) => (p.role === "owner" ? "🌷 " : "") + p.name);
+  const who = $("who");
+  who.hidden = names.length === 0;
+  who.innerHTML = "";
+  const b = document.createElement("b");
+  b.textContent = "Trong vườn: ";
+  who.append(b, names.slice(0, 8).join(", ") + (names.length > 8 ? ` +${names.length - 8}` : ""));
 }
-boot();
-window.addEventListener("resize", () =>
+function setPeer(uid, d) {
+  peers[uid] = d;
+  updateWho();
+  if (uid === ME.uid) return;
+  let el = cursorEls[uid];
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "cursor";
+    el.style.setProperty("--c", `hsl(${hueOf(uid)} 55% 42%)`);
+    el.innerHTML = `<svg viewBox="0 0 18 22"><path d="M1 1 L1 17 L5 13 L8 20 L11 19 L8 12 L14 12 Z" fill="var(--c)" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg><span></span>`;
+    $("cursor-layer").appendChild(el);
+    cursorEls[uid] = el;
+  }
+  el.querySelector("span").textContent = (d.role === "owner" ? "🌷 " : "") + d.name;
+  el.style.transform = `translate(${clamp(d.x, 0, 1) * window.innerWidth}px, ${clamp(d.y, 0, 1) * window.innerHeight}px)`;
+  el.classList.toggle("idle", Date.now() - (d.t || 0) > 45000);
+}
+function removePeer(uid) {
+  delete peers[uid];
+  cursorEls[uid]?.remove();
+  delete cursorEls[uid];
+  updateWho();
+}
+function startPresence() {
+  const me = db.ref("presence/" + ME.uid);
+  me.onDisconnect().remove();
+  me.set({ name: ME.name, role: ROLE, x: 0.5, y: 0.5, t: Date.now() });
+  let last = 0;
+  document.addEventListener("pointermove", (e) => {
+    const now = Date.now();
+    if (now - last < 90) return;
+    last = now;
+    me.update({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight, t: now });
+  }, { passive: true });
+  setInterval(() => me.update({ t: Date.now() }), 20000);       // còn ở đó
+  setInterval(() => Object.keys(cursorEls).forEach((u) => {
+    cursorEls[u].classList.toggle("idle", Date.now() - (peers[u]?.t || 0) > 45000);
+  }), 10000);
+  const ps = db.ref("presence");
+  ps.on("child_added", (s) => setPeer(s.key, s.val()));
+  ps.on("child_changed", (s) => setPeer(s.key, s.val()));
+  ps.on("child_removed", (s) => removePeer(s.key));
+}
+
+// ---------- Nhật ký ra vào vườn ----------
+let visitRef = null;
+function logVisit() {
+  visitRef = db.ref("visits").push();
+  visitRef.set({ uid: ME.uid, name: ME.name, role: ROLE, at: SV.TIMESTAMP });
+  visitRef.onDisconnect().update({ leftAt: SV.TIMESTAMP });
+}
+const fmtTime = (ts) => new Date(ts).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+let logQuery = null, logCb = null;
+function renderLog(obj) {
+  const rows = Object.keys(obj || {}).map((k) => obj[k]).sort((a, b) => (b.at || 0) - (a.at || 0));
+  $("log-empty").hidden = rows.length > 0;
+  $("log-table-wrap").hidden = rows.length === 0;
+  const tb = $("log-table").querySelector("tbody");
+  tb.innerHTML = "";
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    const who = document.createElement("td");
+    who.textContent = r.name || "?";
+    const tag = document.createElement("span");
+    tag.className = "role-tag";
+    tag.textContent = r.role === "owner" ? "chủ vườn" : "khách";
+    who.appendChild(tag);
+    const inn = document.createElement("td");
+    inn.textContent = r.at ? fmtTime(r.at) : "";
+    const out = document.createElement("td");
+    if (r.leftAt) out.textContent = fmtTime(r.leftAt);
+    else if (peers[r.uid]) { out.textContent = "đang ở trong vườn"; out.className = "still-in"; }
+    else out.textContent = "—";
+    tr.append(who, inn, out);
+    tb.appendChild(tr);
+  });
+}
+function openLog() {
+  if (!isOwner()) return;
+  $("log-overlay").hidden = false;
+  logQuery = db.ref("visits").limitToLast(300);
+  logCb = logQuery.on("value", (s) => renderLog(s.val()));
+}
+function closeLog() {
+  $("log-overlay").hidden = true;
+  if (logQuery) { logQuery.off("value", logCb); logQuery = null; }
+}
+$("log-btn").addEventListener("click", openLog);
+$("log-close").addEventListener("click", closeLog);
+$("log-overlay").addEventListener("click", (e) => { if (e.target === $("log-overlay")) closeLog(); });
+
+// ---------- Sao lưu / nhập vườn (chủ vườn) ----------
+function exportGarden() {
+  const data = {
+    version: 2,
+    poems: state.poems.map(({ id, texts, types, hybrid, parents, x, y, status, missing }) => ({ id, texts, types, hybrid, parents, x, y, status, missing })),
+    fallen: state.fallen.map(({ id, word, flowerId, key, x, b }) => ({ id, word, flowerId, key, x, b })),
+    compost: state.compost,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "sao-luu-khu-vuon.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`Đã sao lưu ${data.poems.length} bông hoa ra file.`);
+}
+
+function importData(o) {
+  const poems = (Array.isArray(o) ? o : o.poems || []).map(normPoem).map((p) => ({ ...p, id: p.id || newId() }));
+  if (!poems.length) { toast("File không có bông hoa nào."); return false; }
+  if (!confirm(`Nhập ${poems.length} bông hoa vào vườn? (hoa trùng mã sẽ được ghi đè)`)) return false;
+  const upd = {};
+  poems.forEach((p) => { upd[`poems/${p.id}`] = poemToDb(p); });
+  (o.fallen || []).forEach((f) => {
+    if (f && f.word && f.flowerId) upd[`fallen/${f.id || newId()}`] = { word: f.word, flowerId: f.flowerId, key: f.key, x: f.x ?? 0.5, b: f.b ?? 60, t: 0 };
+  });
+  db.ref("garden").update(upd);
+  if (o.compost > 0) db.ref("garden/compost").transaction((c) => (c || 0) + o.compost);
+  toast(`Đã nhập ${poems.length} bông hoa.`);
+  return true;
+}
+
+function importFromLegacy() {
+  const legacy = readLegacy();
+  if (!legacy) return false;
+  const ok = importData(legacy);
+  if (ok) { try { localStorage.setItem("khuVuonDaNhap", "1"); } catch {} }
+  return ok;
+}
+
+$("export-btn").addEventListener("click", exportGarden);
+$("import-btn").addEventListener("click", () => {
+  const legacy = readLegacy();
+  if (legacy && confirm(`Tìm thấy vườn cũ trong trình duyệt này (${legacy.poems.length} bông hoa).\nBấm OK để nhập vườn cũ, hoặc Hủy để chọn file sao lưu.`)) {
+    importFromLegacy();
+    return;
+  }
+  $("import-file").click();
+});
+$("import-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try { importData(JSON.parse(await file.text())); }
+  catch { toast("Không đọc được file này."); }
+});
+
+// ---------- Cổng vào vườn ----------
+let entered = false;
+const NAME_KEY = "khuVuonTen";
+const savedName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
+
+function showGate() {
+  $("gate").hidden = false;
+  document.body.classList.add("locked");
+}
+
+function enter(role, name, user) {
+  if (entered) return;
+  entered = true;
+  ROLE = role;
+  ME = { uid: user.uid, name };
+  document.body.classList.toggle("guest", role !== "owner");
+  document.body.classList.remove("locked");
+  $("gate").hidden = true;
+  startGarden();
+}
+
+function authMessage(err) {
+  const c = (err && err.code) || "";
+  if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-login-credentials"].includes(c)) return "Sai mật khẩu.";
+  if (c === "auth/too-many-requests") return "Thử sai nhiều lần quá, chờ một lát rồi thử lại nhé.";
+  if (c === "auth/network-request-failed") return "Không có mạng.";
+  if (c === "auth/operation-not-allowed" || c === "auth/admin-restricted-operation") return "Chưa bật kiểu đăng nhập này trong Firebase (xem SETUP.md).";
+  if (c === "auth/unauthorized-domain") return "Tên miền này chưa được thêm vào Firebase (xem SETUP.md, bước 6).";
+  return (err && err.message) || "Không vào được vườn.";
+}
+
+$("gate-owner").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const pass = $("owner-pass").value;
+  const err = $("owner-err");
+  err.textContent = "";
+  if (!pass) { err.textContent = "Nhập mật khẩu nhé."; return; }
+  const btn = e.target.querySelector("button");
+  btn.disabled = true;
+  try {
+    const r = await auth.signInWithEmailAndPassword(OWNER_MAIL, pass);
+    enter("owner", "Chủ vườn", r.user);
+  } catch (ex) {
+    err.textContent = authMessage(ex);
+  } finally {
+    btn.disabled = false;
+    $("owner-pass").value = "";
+  }
+});
+
+$("gate-guest").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("guest-name").value.trim().replace(/\s+/g, " ");
+  const err = $("guest-err");
+  err.textContent = "";
+  if (!name) { err.textContent = "Cho mình biết tên bạn nhé."; return; }
+  try { localStorage.setItem(NAME_KEY, name); } catch {}
+  const btn = e.target.querySelector("button");
+  btn.disabled = true;
+  try {
+    let user = auth.currentUser;
+    if (!user || user.email === OWNER_MAIL) {
+      if (user) await auth.signOut();
+      user = (await auth.signInAnonymously()).user;
+    }
+    enter("guest", name, user);
+  } catch (ex) {
+    err.textContent = authMessage(ex);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function leave() {
+  try {
+    await visitRef?.update({ leftAt: SV.TIMESTAMP });
+    await db.ref("presence/" + ME.uid).remove();
+  } catch {}
+  await auth.signOut();
+  location.reload();
+}
+$("leave-btn").addEventListener("click", leave);
+
+function startGarden() {
+  attachSync();
+  startPresence();
+  logVisit();
+  ensurePlan();
+  setInterval(checkPlans, 20000);
+  setTimeout(checkPlans, 4000);
+  if (isOwner() && !localStorage.getItem("khuVuonDaNhap")) {
+    // vườn cũ trong trình duyệt (từ trước khi có máy chủ) -> hỏi chuyển lên mạng khi vườn trên mạng còn trống
+    db.ref("garden/poems").once("value").then((s) => {
+      const legacy = readLegacy();
+      if (!s.exists() && legacy && confirm(`Tìm thấy vườn cũ trong trình duyệt này (${legacy.poems.length} bông hoa).\nChuyển lên vườn trực tuyến?`)) importFromLegacy();
+    }).catch(() => {});
+  }
+}
+
+// ---------- Phím tắt ----------
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!$("gift-overlay").hidden) closeGift();
+  else if (!$("log-overlay").hidden) closeLog();
+  else if (!$("basket-overlay").hidden) closeBasket();
+  else if (mode) setMode(null);
+  else if (!panel.hidden) closePanel();
+});
+
+window.addEventListener("resize", () => {
   document.querySelectorAll(".flower").forEach((el) => {
     const p = getPoem(el.dataset.id);
     if (p) placeFlower(el, p);
-  }));
+  });
+  Object.keys(peers).forEach((u) => { if (u !== ME?.uid) setPeer(u, peers[u]); });
+});
+
+// ---------- Khởi động ----------
+async function boot() {
+  document.body.classList.add("locked");
+  $("guest-name").value = savedName();
+  try {
+    const be = await initBackend();
+    db = be.db; auth = be.auth; SV = be.SV; OWNER_MAIL = be.OWNER_EMAIL; BACKEND_MODE = be.mode;
+  } catch (err) {
+    showGate();
+    $("gate-note").textContent = "Không kết nối được máy chủ: " + err.message;
+    return;
+  }
+  $("gate-note").textContent = BACKEND_MODE === "mock"
+    ? "Chế độ thử (chưa nối máy chủ): dữ liệu chỉ lưu trong trình duyệt này, không chia sẻ cho ai. Mật khẩu chủ vườn ở chế độ thử là: thu"
+    : "";
+  auth.onAuthStateChanged((user) => {
+    if (entered) return;
+    if (user && user.email === OWNER_MAIL) enter("owner", "Chủ vườn", user);
+    else if (user && savedName()) enter("guest", savedName(), user);
+    else showGate();
+  });
+}
+boot();

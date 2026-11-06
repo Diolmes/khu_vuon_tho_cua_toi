@@ -29,7 +29,10 @@
     <button id="basket-btn" type="button">🧺 Giỏ <span id="basket-count">0</span></button>
     <button id="rain-btn" type="button" title="Gọi mưa">☔</button>
     <button id="bee-btn" type="button" title="Gọi ong đi thụ phấn">🐝</button>
-    <button id="export-btn" type="button" title="Xuất vườn ra file garden.json để đăng lên web">📤 Xuất vườn</button>
+    <button id="log-btn" type="button" title="Nhật ký: ai đã vào vườn lúc nào">📖 Nhật ký</button>
+    <button id="export-btn" type="button" title="Sao lưu cả khu vườn ra file">📤 Sao lưu</button>
+    <button id="import-btn" type="button" title="Nhập vườn từ file sao lưu hoặc vườn cũ trên máy này">📥 Nhập</button>
+    <button id="leave-btn" type="button" title="Rời vườn">🚪 Rời vườn</button>
   </div>
 
   <div id="mode-banner" hidden>
@@ -38,8 +41,22 @@
   </div>
 
   <!-- Thùng phân hữu cơ -->
-  <button id="bin" type="button" aria-label="Thùng rác hữu cơ">
-    <span class="bin-icon">🗑️</span>
+  <button id="bin" type="button" aria-label="Giỏ phân hữu cơ">
+    <svg class="bin-svg" viewBox="0 0 80 72" aria-hidden="true">
+      <defs>
+        <pattern id="weave" width="8" height="8" patternUnits="userSpaceOnUse">
+          <rect width="8" height="8" fill="#e3bd7a"/>
+          <path d="M0 0 L8 8 M8 0 L0 8" stroke="#b98a4a" stroke-width="1.4"/>
+        </pattern>
+      </defs>
+      <path d="M13 32 Q40 -8 67 32" fill="none" stroke="#b98a4a" stroke-width="4" stroke-linecap="round"/>
+      <path d="M10 31 L70 31 L63 64 Q40 71 17 64 Z" fill="url(#weave)" stroke="#a9783a" stroke-width="2" stroke-linejoin="round"/>
+      <ellipse cx="40" cy="31" rx="30" ry="7" fill="#5a3b22" stroke="#a9783a" stroke-width="3"/>
+      <path d="M15 31 Q21 17 33 20 Q40 10 48 19 Q60 16 65 31 Z" fill="#6b4a2e"/>
+      <path d="M39 14 Q37 7 31 6" stroke="#6aa04f" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <ellipse cx="30" cy="6" rx="4.2" ry="2.3" fill="#7fb069" transform="rotate(-20 30 6)"/>
+      <path d="M10 31 Q40 43 70 31" fill="none" stroke="#c99a58" stroke-width="4" stroke-linecap="round"/>
+    </svg>
     <span class="bin-label">kéo phân ra bón</span>
     <span id="bin-count">0</span>
   </button>
@@ -62,7 +79,12 @@
   <section id="seed-box">
     <button id="seed-toggle" type="button" aria-expanded="false">🌱 Hạt giống</button>
     <form id="seed-form" hidden>
-      <textarea id="poem-input" rows="8" placeholder="Dán bài thơ của bạn vào hạt giống này..."></textarea>
+      <textarea id="poem-input" rows="8" placeholder="Dán bài thơ vào đây, hoặc thả/dán một tấm ảnh có chữ để web tự đọc..."></textarea>
+      <div class="ocr-row">
+        <label class="ocr-btn" for="poem-image">📷 Đọc chữ từ ảnh</label>
+        <input type="file" id="poem-image" accept="image/*" hidden>
+        <span id="ocr-status" hidden></span>
+      </div>
       <button type="submit">Gieo hạt</button>
     </form>
   </section>
@@ -86,8 +108,60 @@
     </div>
   </div>
 
+  <div id="gift-overlay" hidden>
+    <form id="gift-box" autocomplete="off">
+      <button id="gift-cancel" type="button" aria-label="Đóng">×</button>
+      <h2>🎁 Tặng bông hoa</h2>
+      <p>Bạn muốn tặng cho ai? Tên sẽ được viết trên ảnh.</p>
+      <input id="gift-name" type="text" maxlength="30" placeholder="Tên người nhận (ô ghi tên)">
+      <div class="gift-actions">
+        <button type="button" id="gift-skip">Bỏ qua, tặng luôn</button>
+        <button type="submit" id="gift-ok">Tặng</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="who" hidden></div>
+  <div id="cursor-layer" aria-hidden="true"></div>
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+
+  <!-- Nhật ký ra vào vườn (chủ vườn) -->
+  <div id="log-overlay" hidden>
+    <div id="log-box">
+      <button id="log-close" type="button" aria-label="Đóng">×</button>
+      <h2>Nhật ký vườn</h2>
+      <p id="log-empty">Chưa có ai ghé vườn.</p>
+      <div id="log-table-wrap"><table id="log-table"><thead><tr><th>Ai</th><th>Vào lúc</th><th>Rời lúc</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- Cổng vào vườn -->
+  <div id="gate">
+    <div class="gate-card">
+      <h1>Khu vườn thơ của tôi</h1>
+      <p class="gate-sub">chọn cách bước vào vườn</p>
+      <div class="gate-cols">
+        <form id="gate-owner" class="gate-col" autocomplete="off">
+          <h2>🌷 Chủ vườn</h2>
+          <input id="owner-pass" type="password" placeholder="Mật khẩu" autocomplete="current-password">
+          <button type="submit">Vào vườn</button>
+          <p class="gate-err" id="owner-err"></p>
+        </form>
+        <form id="gate-guest" class="gate-col" autocomplete="off">
+          <h2>🐝 Khách</h2>
+          <input id="guest-name" type="text" placeholder="Tên của bạn" maxlength="24">
+          <button type="submit">Vào vườn</button>
+          <p class="gate-err" id="guest-err"></p>
+        </form>
+      </div>
+      <p id="gate-note"></p>
+    </div>
+  </div>
+
   <div id="toast" role="status"></div>
 
+  <script src="firebase-config.js"></script>
+  <script src="backend.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
