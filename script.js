@@ -505,6 +505,7 @@ gardenEl.addEventListener("click", (e) => {
     status: "garden",
     t: Date.now(),
   });
+  touchPoem(p.id);
   toast("Đã trồng lại bông hoa 🌷");
 }, true);
 
@@ -534,6 +535,7 @@ function sowSeed(text, extra = {}) {
   holdRender.add(p.id);               // hạt rơi xong mới cho hoa nở
   state.poems.push(p);
   const saved = db.ref("garden/poems/" + p.id).set(poemToDb(p));
+  touchPoem(p.id);
   refreshHint();
 
   // Hạt rơi xuống rồi hoa nở
@@ -653,6 +655,7 @@ function openPoem(id, fromBasket = false) {
   $("delete-btn").style.display = fromBasket ? "none" : "";
   openId = id;
   pickedWord = null;
+  if (!fromBasket) touchPoem(id);
   renderPoem(p);
   panel.hidden = false;
   panel.style.animation = "none"; panel.offsetHeight; panel.style.animation = "";
@@ -1358,6 +1361,7 @@ async function fertilize(id) {
   const upd = { [`poems/${id}/missing`]: null };
   state.fallen.filter((f) => f.flowerId === id).forEach((f) => { upd[`fallen/${f.id}`] = null; });
   db.ref("garden").update(upd);
+  touchPoem(id);
   const pt = headPoint(id);
   if (pt) { puff(pt, "🌿"); puff(pt, "✨"); }
   toast("Bông hoa đã đứng thẳng lại 🌼");
@@ -1529,7 +1533,125 @@ async function triggerRain(manual) {
   startRain(true);
 }
 
-// Kế hoạch mỗi ngày: một giờ mưa và một giờ ong thụ phấn, chọn ngẫu nhiên trong 8h-22h
+// ---------- Bướm: bay một vòng, đậu lên bài thơ vừa được chạm tới gần nhất, rồi bay thêm một vòng ----------
+const BTF_SVG = `<svg viewBox="0 0 40 34">
+  <g class="wing l">
+    <ellipse cx="11" cy="11" rx="10" ry="9" fill="var(--bw)" transform="rotate(-20 11 11)"/>
+    <ellipse cx="13" cy="25" rx="7.5" ry="6" fill="var(--bw)" transform="rotate(15 13 25)"/>
+    <circle cx="9" cy="10" r="2.6" fill="var(--bw2)"/>
+  </g>
+  <g class="wing r">
+    <ellipse cx="29" cy="11" rx="10" ry="9" fill="var(--bw)" transform="rotate(20 29 11)"/>
+    <ellipse cx="27" cy="25" rx="7.5" ry="6" fill="var(--bw)" transform="rotate(-15 27 25)"/>
+    <circle cx="31" cy="10" r="2.6" fill="var(--bw2)"/>
+  </g>
+  <ellipse cx="20" cy="18" rx="1.9" ry="10" fill="#4a3b32"/>
+  <path d="M20 9 Q16 2 12 3 M20 9 Q24 2 28 3" stroke="#4a3b32" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+</svg>`;
+const BTF_COLORS = [["#f59a3d", "#fff0c8"], ["#6fb7e9", "#eaf6ff"], ["#e98bb5", "#ffe9f2"], ["#9a86d9", "#f0eaff"], ["#f2d04a", "#fffbe0"]];
+
+// chạy một đoạn hoạt ảnh trong `ms` mili giây, fn(u) với u từ 0 đến 1
+function animate(ms, fn) {
+  return new Promise((res) => {
+    const t0 = performance.now();
+    (function step(now) {
+      const u = clamp((now - t0) / ms, 0, 1);
+      fn(u);
+      if (u < 1) requestAnimationFrame(step); else res();
+    })(t0);
+  });
+}
+
+// bài thơ để bướm đậu: bài được chạm tới (mở đọc, bón phân, trồng lại, gieo) gần nhất
+function pickButterflyTarget() {
+  const garden = state.poems.filter((p) => p.status === "garden");
+  if (!garden.length) return null;
+  const t = state.touch;
+  if (t && garden.some((p) => p.id === t.id)) return t.id;
+  return garden.slice().sort((a, b) => (b.t || 0) - (a.t || 0))[0].id;    // chưa ai chạm vào: bông mới nhất
+}
+function touchPoem(id) {
+  try { db.ref("garden/lastTouch").set({ id, at: SV.TIMESTAMP }); } catch {}
+}
+
+let btfRunning = false;
+async function runButterfly(poemId, seedId = "") {
+  if (btfRunning) return;
+  btfRunning = true;
+  const el = document.createElement("div");
+  el.className = "bf";
+  el.innerHTML = BTF_SVG;
+  const [c1, c2] = BTF_COLORS[[...(seedId || poemId)].reduce((h, c) => h + c.charCodeAt(0), 0) % BTF_COLORS.length];
+  el.style.setProperty("--bw", c1);
+  el.style.setProperty("--bw2", c2);
+  $("bee-layer").appendChild(el);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const pos = { x: -50, y: vh * 0.45, dir: 1, t: 0 };
+  const place = (x, y) => {
+    if (Math.abs(x - pos.x) > 0.3) pos.dir = x > pos.x ? 1 : -1;
+    pos.x = x; pos.y = y; pos.t += 0.016;
+    const wob = el.classList.contains("landed") ? 0 : Math.sin(pos.t * 9) * 4;
+    el.style.transform = `translate(${x - 19}px, ${y - 17 + wob}px) scaleX(${pos.dir})`;
+  };
+  const flyTo = (x, y) => {
+    const x0 = pos.x, y0 = pos.y, d = Math.hypot(x - x0, y - y0);
+    const nx = d ? -(y - y0) / d : 0, ny = d ? (x - x0) / d : 0;          // hướng vuông góc để lượn sóng
+    return animate(clamp(d / 140, 0.9, 4.5) * 1000, (u) => {
+      const e = u * u * (3 - 2 * u), w = Math.sin(u * Math.PI * 3) * 16 * Math.sin(u * Math.PI);
+      place(x0 + (x - x0) * e + nx * w, y0 + (y - y0) * e + ny * w);
+    });
+  };
+  // bay một vòng elip: bắt đầu từ góc `a0` (0 = bên phải, π/2 = phía dưới, π = bên trái)
+  const orbit = async (cx, cy, rx, ry, a0, ms) => {
+    const at = (a) => ({ x: clamp(cx + Math.cos(a) * rx, 24, window.innerWidth - 24), y: Math.max(70, cy + Math.sin(a) * ry) });
+    const s = at(a0);
+    if (Math.hypot(s.x - pos.x, s.y - pos.y) > 8) await flyTo(s.x, s.y);
+    await animate(ms, (u) => { const p = at(a0 + u * Math.PI * 2); place(p.x, p.y); });
+  };
+
+  try {
+    // 1) vào vườn, bay một vòng quanh khu vườn
+    await orbit(vw / 2, vh * 0.5, vw * 0.34, vh * 0.17, Math.PI, 6500);
+    // 2) đậu lên bài thơ
+    let h = headPoint(poemId);
+    if (h) {
+      await flyTo(h.x, h.y - 6);
+      el.classList.add("landed");
+      emitScent(poemId);
+      await animate(8500, (u) => {
+        const n = headPoint(poemId);
+        if (n) { h = n; place(n.x + Math.sin(u * 40) * 1.2, n.y - 6); }
+      });
+      el.classList.remove("landed");
+      // 3) cất cánh, bay thêm một vòng quanh bông hoa
+      await orbit(h.x, h.y - 70, 150, 70, Math.PI / 2, 5500);
+    }
+    // 4) bay đi
+    await flyTo(window.innerWidth + 60, pos.y - 90);
+  } finally {
+    el.remove();
+    btfRunning = false;
+  }
+}
+
+// Bướm mỗi ngày bay một lần (cả vườn dùng chung một lượt)
+let btfSeen = null;
+async function claimButterfly(manual) {
+  if (manual && !isOwner()) return false;
+  const target = pickButterflyTarget();
+  if (!target) { if (manual) toast("Vườn chưa có bông hoa nào để bướm đậu."); return false; }
+  const today = dayKey(), myId = newId();
+  btfSeen = myId;
+  const res = await db.ref("garden/butterfly").transaction((cur) => {
+    if (cur && cur.lastDay === today) return undefined;
+    return { lastDay: today, at: Date.now(), id: myId, poem: target, by: ME.uid };
+  });
+  if (!res.committed) { if (manual) toast("Hôm nay bướm đã bay rồi, mai nhé 🦋"); return false; }
+  runButterfly(target, myId);
+  return true;
+}
+
+// Kế hoạch mỗi ngày: một giờ mưa, một giờ ong thụ phấn và một giờ bướm bay, chọn ngẫu nhiên trong 8h-22h
 async function ensurePlan() {
   const today = dayKey();
   await db.ref("garden/plan").transaction((cur) => {
@@ -1539,7 +1661,7 @@ async function ensurePlan() {
     const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 22, 0).getTime();
     const now = Date.now();
     const pick = () => Math.round(rand(Math.max(start, now + 30000), Math.max(end, now + 120000)));
-    return { day: today, rainAt: pick(), beeAt: pick(), rainDone: false, beeDone: false };
+    return { day: today, rainAt: pick(), beeAt: pick(), butterflyAt: pick(), rainDone: false, beeDone: false, butterflyDone: false };
   });
 }
 async function checkPlans() {
@@ -1555,9 +1677,18 @@ async function checkPlans() {
     const r = await db.ref("garden/plan").transaction((cur) => (cur && !cur.beeDone ? { ...cur, beeDone: true } : undefined));
     if (r.committed) claimPollination(false);
   }
+  if (pl.butterflyAt == null) {          // kế hoạch hôm nay lập từ trước khi có bướm: thêm giờ bướm
+    const end = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 22, 0).getTime();
+    const at = Math.round(rand(now + 30000, Math.max(end, now + 120000)));
+    await db.ref("garden/plan").transaction((cur) => (cur && cur.butterflyAt == null ? { ...cur, butterflyAt: at, butterflyDone: false } : undefined));
+  } else if (!pl.butterflyDone && now >= pl.butterflyAt) {
+    const r = await db.ref("garden/plan").transaction((cur) => (cur && !cur.butterflyDone ? { ...cur, butterflyDone: true } : undefined));
+    if (r.committed) claimButterfly(false);
+  }
 }
 
 $("bee-btn").addEventListener("click", () => claimPollination(true));
+$("butterfly-btn").addEventListener("click", () => claimButterfly(true));
 $("rain-btn").addEventListener("click", () => {
   if (raining) { toast("Trời đang mưa rồi."); return; }
   triggerRain(true);
@@ -1655,6 +1786,11 @@ function attachSync() {
     const v = s.val();
     if (v && v.id && v.id !== beeSeen && Date.now() - v.at < 45000) { beeSeen = v.id; runPollination(v.mom, v.dad, false); }
   });
+  listen(db.ref("garden/lastTouch"), "value", (s) => { state.touch = s.val(); });
+  listen(db.ref("garden/butterfly"), "value", (s) => {
+    const v = s.val();
+    if (v && v.id && v.id !== btfSeen && Date.now() - v.at < 45000) { btfSeen = v.id; runButterfly(v.poem, v.id); }
+  });
   // hộp hạt giống tặng: chỉ chủ vườn đọc được (luật máy chủ cũng chặn khách)
   if (isOwner()) listen(db.ref("gifts"), "value", (s) => { state.gifts = s.val() || {}; updateGiftsCount(); });
   refreshHint();
@@ -1729,7 +1865,7 @@ function resetGardenView() {
   closePanel(); closeBasket(); closeSeedGifts(); setMode(null);
   gardenEl.querySelectorAll(".flower, .fallen, .seed").forEach((el) => el.remove());
   holdRender.clear();
-  Object.assign(state, { poems: [], fallen: [], compost: 0, bag: [], order: null, last: null, plan: null, gifts: {} });
+  Object.assign(state, { poems: [], fallen: [], compost: 0, bag: [], order: null, last: null, plan: null, touch: null, gifts: {} });
 }
 
 async function enterDemo() {
@@ -1738,7 +1874,7 @@ async function enterDemo() {
   let snap;
   try { snap = (await db.ref("garden").once("value")).val() || {}; }
   catch { toast("Chưa tải được vườn để thử, bạn thử lại nhé."); return; }
-  delete snap.plan; delete snap.rainNow; delete snap.bee;      // để khách tự thử gọi mưa, gọi ong
+  delete snap.plan; delete snap.rainNow; delete snap.bee; delete snap.butterfly;      // để khách tự thử gọi mưa, gọi ong, gọi bướm
   resetGardenView();
   realDb = realDb || db;
   db = makeMemoryDb({ garden: snap });

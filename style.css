@@ -689,6 +689,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 /* ---------- Vai trò: khách không gieo hạt, không cho ong; chủ vườn mới có nhật ký/sao lưu/nhập ---------- */
 .guest #gifts-btn,
 .guest #bee-btn,
+.guest #butterfly-btn,
 .guest #log-btn,
 .guest #export-btn,
 .guest #import-btn,
@@ -994,9 +995,10 @@ body.locked #seed-box, body.locked #who, body.locked #bee-layer { visibility: hi
   border: 2px solid var(--accent); border-radius: 999px; padding: 4px 12px; cursor: pointer;
 }
 .draw-tools button:hover, .draw-actions button:hover { background: #ffeef2; }
-.draw-tools button.on { background: var(--accent); color: #fff; }
+.draw-tools button.on { background: #d9588a; border-color: #d9588a; color: #fff; }
 .draw-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; }
-.draw-actions #draw-done { background: var(--accent); color: #fff; padding: 6px 22px; }
+.draw-actions #draw-done { background: #d9588a; border-color: #d9588a; color: #fff; padding: 6px 26px; font-weight: bold; }
+.draw-actions #draw-done:hover { background: #c4437a; border-color: #c4437a; }
 
 /* ---------- Căn lề bài thơ ---------- */
 #align-bar { display: flex; gap: 4px; margin: 0 0 8px; }
@@ -1009,3 +1011,12 @@ body.locked #seed-box, body.locked #who, body.locked #bee-layer { visibility: hi
 #align-bar button svg { fill: currentColor; }
 #align-bar button:hover { opacity: 1; }
 #align-bar button.on { opacity: 1; background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---------- Bướm ---------- */
+.bf { position: absolute; left: 0; top: 0; width: 38px; height: 32px; will-change: transform; --bw: #f59a3d; --bw2: #fff0c8; }
+.bf svg { width: 100%; height: 100%; overflow: visible; }
+.bf .wing { transform-box: fill-box; animation: bflap .24s ease-in-out infinite alternate; }
+.bf .wing.l { transform-origin: 100% 50%; }
+.bf .wing.r { transform-origin: 0% 50%; }
+.bf.landed .wing { animation-duration: 1.7s; }
+@keyframes bflap { from { transform: scaleX(1); } to { transform: scaleX(.22); } }

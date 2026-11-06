@@ -27,6 +27,12 @@
       },
       "seedbag": {
         ".write": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'"
+      },
+      "butterfly": {
+        ".write": "auth != null"
+      },
+      "lastTouch": {
+        ".write": "auth != null"
       }
     },
     "presence": {
