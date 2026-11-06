@@ -2,31 +2,66 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "garden": {
       ".read": "auth != null",
-
       "poems": {
         "$id": {
           ".write": "auth != null && ((data.exists() && newData.exists()) || auth.token.email == 'chu-vuon@khuvuontho.app' || (!data.exists() && newData.child('hybrid').val() == true))"
         }
       },
-      "fallen":   { ".write": "auth != null" },
-      "compost":  { ".write": "auth != null", ".validate": "newData.isNumber() && newData.val() >= 0" },
-      "plan":     { ".write": "auth != null" },
-      "rainNow":  { ".write": "auth != null" },
-      "bee":      { ".write": "auth != null" },
-      "seedbag":  { ".write": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'" }
+      "fallen": {
+        ".write": "auth != null"
+      },
+      "compost": {
+        ".write": "auth != null",
+        ".validate": "newData.isNumber() && newData.val() >= 0"
+      },
+      "plan": {
+        ".write": "auth != null"
+      },
+      "rainNow": {
+        ".write": "auth != null"
+      },
+      "bee": {
+        ".write": "auth != null"
+      },
+      "seedbag": {
+        ".write": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'"
+      }
     },
-
     "presence": {
       ".read": "auth != null",
-      "$uid": { ".write": "auth != null && auth.uid == $uid" }
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
     },
-
     "visits": {
       ".read": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'",
-      "$key": { ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)" }
+      "$key": {
+        ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)"
+      }
+    },
+    "gifts": {
+      ".read": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'",
+      "$id": {
+        ".write": "auth != null && (auth.token.email == 'chu-vuon@khuvuontho.app' || (!data.exists() && newData.child('fromUid').val() == auth.uid))",
+        ".validate": "newData.hasChildren(['from','fromUid','text']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 4000 && newData.child('from').isString() && newData.child('from').val().length <= 40",
+        "from": {
+          ".validate": true
+        },
+        "fromUid": {
+          ".validate": true
+        },
+        "text": {
+          ".validate": true
+        },
+        "t": {
+          ".validate": true
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }

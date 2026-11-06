@@ -35,8 +35,14 @@ async function initBackend() {
   return makeMock();
 }
 
+// Cơ sở dữ liệu tạm trong bộ nhớ (cùng giao diện), khởi tạo từ bản chụp dữ liệu seed
+function makeMemoryDb(seed) { return makeMock({ memory: true, seed }).db; }
+
 // ---------- Bản giả lập (lưu trong localStorage, đồng bộ giữa các tab cùng trình duyệt) ----------
-function makeMock() {
+// opts.memory = true: chỉ giữ trong bộ nhớ (không đụng localStorage, không chia sẻ giữa các tab), tắt trang là mất.
+// opts.seed: dữ liệu ban đầu. Dùng cho chế độ "hóa thân chủ vườn" của khách.
+function makeMock(opts = {}) {
+  const mem = !!opts.memory;
   const KEY = "khuVuonMockDb";
   const SV = { TIMESTAMP: { ".sv": "timestamp" } };
   let root = {};
@@ -45,8 +51,8 @@ function makeMock() {
   let counter = 0;
 
   const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
-  const write = () => { try { localStorage.setItem(KEY, JSON.stringify(root)); } catch {} };
-  const sync = () => { root = read(); };
+  const write = () => { if (mem) return; try { localStorage.setItem(KEY, JSON.stringify(root)); } catch {} };
+  const sync = () => { if (!mem) root = read(); };
   const clone = (v) => (v === null || v === undefined ? null : JSON.parse(JSON.stringify(v)));
   const parts = (p) => String(p).split("/").filter(Boolean);
 
@@ -186,13 +192,16 @@ function makeMock() {
     return r;
   }
 
-  window.addEventListener("storage", (e) => { if (e.key === KEY) { sync(); notify(); } });
-  window.addEventListener("pagehide", () => {
-    sync();
-    discon.forEach((f) => f());
-    discon = [];
-    write();
-  });
+  if (!mem) {
+    window.addEventListener("storage", (e) => { if (e.key === KEY) { sync(); notify(); } });
+    window.addEventListener("pagehide", () => {
+      sync();
+      discon.forEach((f) => f());
+      discon = [];
+      write();
+    });
+  }
+  if (mem && opts.seed) root = clean(clone(opts.seed)) || {};
   sync();
 
   // ----- đăng nhập giả lập (mỗi tab một người) -----

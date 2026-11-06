@@ -27,6 +27,8 @@
   <!-- Thanh công cụ -->
   <div id="toolbar">
     <button id="basket-btn" type="button">🧺 Giỏ <span id="basket-count">0</span></button>
+    <button id="gifts-btn" type="button" title="Hạt giống khách tặng bạn">🎁 Hạt được tặng <span id="gifts-count">0</span></button>
+    <button id="demo-btn" type="button" title="Thử làm chủ vườn. Mọi thay đổi chỉ để thử và biến mất khi thoát">🎭 Hóa thân chủ vườn</button>
     <button id="rain-btn" type="button" title="Gọi mưa">☔</button>
     <button id="bee-btn" type="button" title="Gọi ong đi thụ phấn">🐝</button>
     <button id="log-btn" type="button" title="Nhật ký: ai đã vào vườn lúc nào">📖 Nhật ký</button>
@@ -58,7 +60,6 @@
       <path d="M10 31 Q40 43 70 31" fill="none" stroke="#c99a58" stroke-width="4" stroke-linecap="round"/>
     </svg>
     <span class="bin-label">kéo phân ra bón</span>
-    <span id="bin-count">0</span>
   </button>
 
   <!-- Cái vợt: quét chữ rơi -->
@@ -85,6 +86,7 @@
         <input type="file" id="poem-image" accept="image/*" hidden>
         <span id="ocr-status" hidden></span>
       </div>
+      <p id="seed-note" hidden>🎁 Hạt sẽ nằm trong hộp hạt giống tặng của chủ vườn, kèm tên <b id="seed-note-name"></b>. Chủ vườn quyết định có gieo hay không. Hoa mọc từ hạt tặng sẽ có màu đen trắng.</p>
       <button type="submit">Gieo hạt</button>
     </form>
   </section>
@@ -119,6 +121,22 @@
         <button type="submit" id="gift-ok">Tặng</button>
       </div>
     </form>
+  </div>
+
+  <!-- Hộp hạt giống được tặng (chủ vườn) -->
+  <div id="seedgift-overlay" hidden>
+    <div id="seedgift-box">
+      <button id="seedgift-close" type="button" aria-label="Đóng">×</button>
+      <h2>🎁 Hạt giống được tặng</h2>
+      <p id="seedgift-empty">Chưa có ai tặng hạt giống.</p>
+      <div id="seedgift-list"></div>
+    </div>
+  </div>
+
+  <!-- Báo cho khách biết đang ở chế độ trải nghiệm -->
+  <div id="demo-banner" hidden>
+    <span>🎭 Đang trải nghiệm làm chủ vườn. Mọi thay đổi chỉ để thử và sẽ biến mất khi bạn thoát chế độ này hoặc thoát khỏi trang.</span>
+    <button id="demo-exit" type="button">Thoát chế độ trải nghiệm</button>
   </div>
 
   <div id="who" hidden></div>

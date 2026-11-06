@@ -18,6 +18,8 @@ const binEl = $("bin");
 let ROLE = null;      // "owner" | "guest"
 let ME = null;        // { uid, name }
 let db = null, auth = null, SV = null, OWNER_MAIL = "", BACKEND_MODE = "mock";
+let realDb = null;    // máy chủ thật; `db` bị tráo sang bộ nhớ tạm khi khách "hóa thân chủ vườn" (DEMO)
+let DEMO = false;
 const isOwner = () => ROLE === "owner";
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -33,6 +35,7 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
     hybrid: bool, parents: [idMẹ, idBố] | null,
     x (0..1), y (0..1, 0 = xa, 1 = gần),
     status: "garden" | "basket",
+    gift: bool, from: tên người tặng   // hoa mọc từ hạt giống khách tặng: đen trắng, chỉ hái được, không tặng lại được
     missing: ["0:3", ...]   // chữ đã rơi: "bài:vị trí chữ"
   }
   fallen = [{ id, word, flowerId, key, x, b, t }]   // chữ đang nằm dưới đất
@@ -265,7 +268,7 @@ function flowerSVG(p, droop = false) {
 // ---------- Dữ liệu ----------
 const NET_KEY = "khuVuonVot";
 function loadNet() { try { return parseInt(localStorage.getItem(NET_KEY), 10) || 0; } catch { return 0; } }
-function saveNet() { try { localStorage.setItem(NET_KEY, String(state.net)); } catch {} }
+function saveNet() { if (DEMO) return; try { localStorage.setItem(NET_KEY, String(state.net)); } catch {} }
 
 state = { poems: [], fallen: [], compost: 0, net: loadNet(), bag: [], order: null, last: null };
 
@@ -285,6 +288,8 @@ function normPoem(p) {
     y: p.y ?? 0.5,
     status: p.status || "garden",
     missing: p.missing || [],
+    gift: !!p.gift,
+    from: p.from || "",
   };
 }
 function poemFromDb(id, d) {
@@ -298,12 +303,15 @@ function poemFromDb(id, d) {
     y: d.y ?? 0.5,
     status: d.status || "garden",
     missing: Object.keys(d.missing || {}),
+    gift: !!d.gift,
+    from: d.from || "",
     t: d.t || 0,
   };
 }
 function poemToDb(p) {
   const o = { texts: p.texts, types: p.types, hybrid: !!p.hybrid, x: p.x, y: p.y, status: p.status || "garden", t: Date.now() };
   if (p.parents) o.parents = p.parents;
+  if (p.gift) { o.gift = true; o.from = p.from || ""; }
   if (p.missing && p.missing.length) { o.missing = {}; p.missing.forEach((k) => { o.missing[k] = true; }); }
   return o;
 }
@@ -370,7 +378,7 @@ function plainText(p, pi) {
 // ---------- Vẽ hoa ----------
 function renderFlower(p, animate) {
   const el = document.createElement("div");
-  el.className = "flower";
+  el.className = "flower" + (p.gift ? " gift" : "");
   el.dataset.id = p.id;
   el.title = p.texts[0].split("\n")[0].slice(0, 40);
   el.innerHTML = flowerSVG(p, false);
@@ -507,12 +515,8 @@ seedToggle.addEventListener("click", () => {
   if (open) poemInput.focus();
 });
 
-seedForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  if (!isOwner()) return;
-  const text = poemInput.value.trim();
-  if (!text) return;
-
+// Gieo một hạt: tạo bài thơ rồi cho hạt rơi xuống, hoa nở. extra = { gift: true, from } cho hạt được tặng.
+function sowSeed(text, extra = {}) {
   const p = {
     id: newId(),
     texts: [text],
@@ -524,13 +528,11 @@ seedForm.addEventListener("submit", (e) => {
     status: "garden",
     missing: [],
     t: Date.now(),
+    ...extra,
   };
   holdRender.add(p.id);               // hạt rơi xong mới cho hoa nở
   state.poems.push(p);
-  db.ref("garden/poems/" + p.id).set(poemToDb(p));
-  poemInput.value = "";
-  seedForm.hidden = true;
-  seedToggle.setAttribute("aria-expanded", false);
+  const saved = db.ref("garden/poems/" + p.id).set(poemToDb(p));
   refreshHint();
 
   // Hạt rơi xuống rồi hoa nở
@@ -550,7 +552,47 @@ seedForm.addEventListener("submit", (e) => {
   };
   seed.addEventListener("animationend", bloomNow);
   setTimeout(bloomNow, 1300);
+  return saved;
+}
+
+// Khách tặng hạt giống: bài thơ vào hộp hạt giống tặng của chủ vườn, tự ghi tên khách (tên nhập lúc vào vườn)
+function sendSeedGift(text) {
+  const btn = seedForm.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  db.ref("gifts").push().set({ from: ME.name, fromUid: ME.uid, text, t: SV.TIMESTAMP })
+    .then(() => {
+      poemInput.value = "";
+      seedForm.hidden = true;
+      seedToggle.setAttribute("aria-expanded", false);
+      toast("Đã gửi hạt giống vào hộp quà của chủ vườn 🎁");
+    })
+    .catch(() => toast("Chưa gửi được hạt giống, bạn thử lại nhé."))
+    .finally(() => { btn.disabled = false; });
+}
+
+seedForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = poemInput.value.trim();
+  if (!text) return;
+  if (!isOwner()) { sendSeedGift(text); return; }
+  sowSeed(text);
+  poemInput.value = "";
+  seedForm.hidden = true;
+  seedToggle.setAttribute("aria-expanded", false);
 });
+
+// Giao diện hạt giống đổi theo vai trò: chủ vườn gieo, khách tặng
+function applyRoleUI() {
+  const owner = isOwner();
+  seedToggle.textContent = owner ? "🌱 Hạt giống" : "🎁 Tặng hạt giống cho chủ vườn";
+  poemInput.placeholder = owner
+    ? "Dán bài thơ vào đây, hoặc thả/dán một tấm ảnh có chữ để web tự đọc..."
+    : "Viết hoặc dán bài thơ bạn muốn tặng chủ vườn...";
+  seedForm.querySelector('button[type="submit"]').textContent = owner ? "Gieo hạt" : "Gửi tặng chủ vườn";
+  $("seed-note").hidden = owner;
+  $("seed-note-name").textContent = ME ? ME.name : "";
+  $("demo-banner").hidden = !DEMO;
+}
 
 // ---------- Đọc chữ từ ảnh (OCR, chạy ngay trong trình duyệt bằng Tesseract.js, tiếng Việt) ----------
 let tessLoading = null;
@@ -614,7 +656,7 @@ function openPoem(id) {
 }
 
 function renderPoem(p) {
-  poemMeta.textContent = p.hybrid ? "chùm thơ lai · 2 bài" : "";
+  poemMeta.textContent = p.gift ? `🎁 hạt giống tặng từ ${p.from || "một người bạn"}` : p.hybrid ? "chùm thơ lai · 2 bài" : "";
   poemText.innerHTML = "";
   p.texts.forEach((text, pi) => {
     if (pi > 0) {
@@ -714,7 +756,7 @@ function buildCard(p) {
   card.className = "card";
 
   const art = document.createElement("div");
-  art.className = "card-art" + (p.hybrid ? " hybrid" : "");
+  art.className = "card-art" + (p.hybrid ? " hybrid" : "") + (p.gift ? " gift" : "");
   art.innerHTML = flowerSVG(p);
   p.texts.forEach((_, pi) => {
     const t = document.createElement("div");
@@ -741,7 +783,7 @@ function buildCard(p) {
 
   const hint = document.createElement("p");
   hint.className = "card-hint";
-  hint.textContent = "chạm vào hoa để đọc to";
+  hint.textContent = p.gift ? `🎁 tặng từ ${p.from || "một người bạn"} · chạm vào hoa để đọc to` : "chạm vào hoa để đọc to";
   card.appendChild(hint);
 
   const actions = document.createElement("div");
@@ -756,7 +798,7 @@ function buildCard(p) {
   gift.textContent = "🎁 Tặng";
   gift.addEventListener("click", () => askGift(p));
   actions.append(replant);
-  if (isOwner()) actions.append(gift);          // chỉ chủ vườn được tặng hoa
+  if (isOwner() && !p.gift) actions.append(gift);   // chỉ chủ vườn được tặng hoa, và hoa được tặng thì không tặng lại
   card.appendChild(actions);
   return card;
 }
@@ -764,7 +806,7 @@ function buildCard(p) {
 // Hộp thoại "ô ghi tên": ghi tên người nhận (hoặc bỏ qua) rồi mới tặng
 let giftTarget = null;
 function askGift(p) {
-  if (!isOwner()) return;
+  if (!isOwner() || p.gift) return;
   giftTarget = p;
   $("gift-name").value = "";
   $("gift-overlay").hidden = false;
@@ -783,7 +825,7 @@ $("gift-overlay").addEventListener("click", (e) => { if (e.target === $("gift-ov
 
 // Tặng = vẽ thẻ hoa thành ảnh PNG, chép vào clipboard (nếu trình duyệt không cho thì tải ảnh về), rồi bỏ khỏi giỏ
 async function giftPoem(p, to = "") {
-  if (!isOwner()) return;
+  if (!isOwner() || p.gift) return;
   const blobPromise = renderCardPNG(p, to);
   let how = null;
   try {
@@ -1082,7 +1124,7 @@ const inRect = (el, x, y, pad = 0) => {
 const coarse = () => window.matchMedia("(pointer: coarse)").matches;
 const overBin = (ev) => inRect(binEl, ev.clientX, ev.clientY, coarse() ? 30 : 12);
 
-function updateBin() { $("bin-count").textContent = state.compost; }
+function updateBin() {}   // đã bỏ bộ đếm số phân bón
 function updateNet() {
   $("net-count").textContent = state.net;
   $("net-count").hidden = state.net === 0;
@@ -1358,7 +1400,7 @@ let lastT = performance.now();
   requestAnimationFrame(loop);
 })(lastT);
 
-const alive = (id) => { const p = getPoem(id); return !!p && p.status === "garden" && !p.hybrid; };
+const alive = (id) => { const p = getPoem(id); return !!p && p.status === "garden" && !p.hybrid && !p.gift; };
 const dayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
 
 async function visit(bee, id) {
@@ -1372,7 +1414,7 @@ async function visit(bee, id) {
 
 // chỉ hoa thường mới được làm bố mẹ, và mỗi cặp chỉ có một hoa con
 function pickPair() {
-  const parents = state.poems.filter((p) => p.status === "garden" && !p.hybrid);
+  const parents = state.poems.filter((p) => p.status === "garden" && !p.hybrid && !p.gift);
   const pairs = [];
   for (let i = 0; i < parents.length; i++) {
     for (let j = i + 1; j < parents.length; j++) {
@@ -1546,37 +1588,159 @@ function onFallenRemoved(id) {
   if (el && !el.classList.contains("scooped")) el.remove();
 }
 
+let syncOffs = [];       // các listener dữ liệu vườn, để gỡ ra khi khách chuyển sang vườn thử
+function listen(ref, type, cb) {
+  ref.on(type, cb);
+  syncOffs.push(() => ref.off(type, cb));
+}
+function detachSync() {
+  syncOffs.forEach((off) => { try { off(); } catch {} });
+  syncOffs = [];
+}
+
 function attachSync() {
   const poems = db.ref("garden/poems");
-  poems.on("child_added", (s) => applyPoem(s.key, s.val()));
-  poems.on("child_changed", (s) => applyPoem(s.key, s.val()));
-  poems.on("child_removed", (s) => removePoem(s.key));
+  listen(poems, "child_added", (s) => applyPoem(s.key, s.val()));
+  listen(poems, "child_changed", (s) => applyPoem(s.key, s.val()));
+  listen(poems, "child_removed", (s) => removePoem(s.key));
 
   const fallen = db.ref("garden/fallen");
-  fallen.on("child_added", (s) => onFallenAdded(s.key, s.val()));
-  fallen.on("child_changed", (s) => onFallenChanged(s.key, s.val()));
-  fallen.on("child_removed", (s) => onFallenRemoved(s.key));
+  listen(fallen, "child_added", (s) => onFallenAdded(s.key, s.val()));
+  listen(fallen, "child_changed", (s) => onFallenChanged(s.key, s.val()));
+  listen(fallen, "child_removed", (s) => onFallenRemoved(s.key));
 
-  db.ref("garden/compost").on("value", (s) => { state.compost = s.val() || 0; updateBin(); });
-  db.ref("garden/seedbag").on("value", (s) => {
+  listen(db.ref("garden/compost"), "value", (s) => { state.compost = s.val() || 0; updateBin(); });
+  listen(db.ref("garden/seedbag"), "value", (s) => {
     const v = s.val();
     state.bag = v ? toArr(v.bag) : [];
     state.order = v && v.order ? toArr(v.order) : null;
     state.last = v && v.last !== undefined ? v.last : null;
   });
-  db.ref("garden/plan").on("value", (s) => { state.plan = s.val(); });
-  db.ref("garden/rainNow").on("value", (s) => {
+  listen(db.ref("garden/plan"), "value", (s) => { state.plan = s.val(); });
+  listen(db.ref("garden/rainNow"), "value", (s) => {
     const v = s.val();
     if (v && v.id !== rainSeen && Date.now() - v.at < 15000) { rainSeen = v.id; startRain(false); }
   });
-  db.ref("garden/bee").on("value", (s) => {
+  listen(db.ref("garden/bee"), "value", (s) => {
     const v = s.val();
     if (v && v.id && v.id !== beeSeen && Date.now() - v.at < 45000) { beeSeen = v.id; runPollination(v.mom, v.dad, false); }
   });
+  // hộp hạt giống tặng: chỉ chủ vườn đọc được (luật máy chủ cũng chặn khách)
+  if (isOwner()) listen(db.ref("gifts"), "value", (s) => { state.gifts = s.val() || {}; updateGiftsCount(); });
   refreshHint();
   updateNet();
   applyGlow();
 }
+
+// ---------- Hộp hạt giống được tặng (chủ vườn) ----------
+state.gifts = {};
+const giftRows = () => Object.keys(state.gifts || {}).map((id) => ({ id, ...state.gifts[id] })).sort((a, b) => (b.t || 0) - (a.t || 0));
+function updateGiftsCount() {
+  $("gifts-count").textContent = giftRows().length;
+  if (!$("seedgift-overlay").hidden) renderSeedGifts();
+}
+function renderSeedGifts() {
+  const rows = giftRows();
+  $("seedgift-empty").hidden = rows.length > 0;
+  const list = $("seedgift-list");
+  list.innerHTML = "";
+  rows.forEach((g) => {
+    const item = document.createElement("div");
+    item.className = "sg-item";
+    const head = document.createElement("div");
+    head.className = "sg-head";
+    const who = document.createElement("b");
+    who.textContent = "🎁 từ " + (g.from || "một người bạn");
+    const when = document.createElement("span");
+    when.textContent = g.t ? fmtTime(g.t) : "";
+    head.append(who, when);
+    const body = document.createElement("div");
+    body.className = "sg-text";
+    body.textContent = g.text || "";
+    const act = document.createElement("div");
+    act.className = "sg-actions";
+    const sow = document.createElement("button");
+    sow.type = "button";
+    sow.textContent = "🌱 Gieo";
+    sow.addEventListener("click", () => sowGift(g));
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.textContent = "Bỏ đi";
+    drop.addEventListener("click", () => {
+      if (confirm(`Bỏ hạt giống của ${g.from || "người này"}? Bạn không lấy lại được.`)) db.ref("gifts/" + g.id).remove();
+    });
+    act.append(sow, drop);
+    item.append(head, body, act);
+    list.appendChild(item);
+  });
+}
+function openSeedGifts() {
+  if (!isOwner()) return;
+  renderSeedGifts();
+  $("seedgift-overlay").hidden = false;
+}
+function closeSeedGifts() { $("seedgift-overlay").hidden = true; }
+function sowGift(g) {
+  if (!isOwner() || !g.text) return;
+  closeSeedGifts();
+  sowSeed(g.text, { gift: true, from: g.from || "" })
+    .then(() => db.ref("gifts/" + g.id).remove())
+    .catch(() => toast("Chưa gieo được hạt này, hạt vẫn còn trong hộp."));
+  toast(`Đã gieo hạt giống của ${g.from || "một người bạn"} 🌱`);
+}
+$("gifts-btn").addEventListener("click", openSeedGifts);
+$("seedgift-close").addEventListener("click", closeSeedGifts);
+$("seedgift-overlay").addEventListener("click", (e) => { if (e.target === $("seedgift-overlay")) closeSeedGifts(); });
+
+// ---------- Khách "hóa thân" chủ vườn để thử (mọi thay đổi chỉ nằm trong bộ nhớ, tắt trang là mất) ----------
+// Dọn khu vườn trên màn hình để nạp lại từ một cơ sở dữ liệu khác
+function resetGardenView() {
+  detachSync();
+  closePanel(); closeBasket(); closeSeedGifts(); setMode(null);
+  gardenEl.querySelectorAll(".flower, .fallen, .seed").forEach((el) => el.remove());
+  holdRender.clear();
+  Object.assign(state, { poems: [], fallen: [], compost: 0, bag: [], order: null, last: null, plan: null, gifts: {} });
+}
+
+async function enterDemo() {
+  if (DEMO || ROLE !== "guest") return;
+  if (!confirm("Hóa thân thành chủ vườn để trải nghiệm?\n\nMọi thay đổi bạn làm trong lúc trải nghiệm chỉ để thử: khu vườn thật không bị ảnh hưởng, và tất cả sẽ biến mất khi bạn thoát chế độ trải nghiệm hoặc thoát khỏi trang.")) return;
+  let snap;
+  try { snap = (await db.ref("garden").once("value")).val() || {}; }
+  catch { toast("Chưa tải được vườn để thử, bạn thử lại nhé."); return; }
+  delete snap.plan; delete snap.rainNow; delete snap.bee;      // để khách tự thử gọi mưa, gọi ong
+  resetGardenView();
+  realDb = realDb || db;
+  db = makeMemoryDb({ garden: snap });
+  DEMO = true;
+  ROLE = "owner";
+  document.body.classList.remove("guest");
+  document.body.classList.add("demo");
+  applyRoleUI();
+  updateGiftsCount();
+  attachSync();
+  ensurePlan();
+  toast("Bạn đang là chủ vườn thử. Mọi thay đổi sẽ biến mất khi thoát chế độ này 🎭");
+}
+
+// Thoát chế độ trải nghiệm: bỏ sạch thay đổi thử, quay về vườn thật ở vai khách (những gì đã làm ở chế độ thường vẫn còn)
+function exitDemo() {
+  if (!DEMO) return;
+  resetGardenView();
+  db = realDb;
+  DEMO = false;
+  ROLE = "guest";
+  state.net = loadNet();
+  document.body.classList.remove("demo");
+  document.body.classList.add("guest");
+  applyRoleUI();
+  updateGiftsCount();
+  attachSync();
+  updateNet();
+  toast("Đã thoát chế độ trải nghiệm, mọi thay đổi thử đã biến mất. Bạn lại là khách 🐝");
+}
+$("demo-btn").addEventListener("click", enterDemo);
+$("demo-exit").addEventListener("click", exitDemo);
 
 // ---------- Ai đang trong vườn + con trỏ ----------
 const peers = {};            // uid -> {name, role, x, y, t}
@@ -1688,7 +1852,7 @@ $("log-overlay").addEventListener("click", (e) => { if (e.target === $("log-over
 function exportGarden() {
   const data = {
     version: 2,
-    poems: state.poems.map(({ id, texts, types, hybrid, parents, x, y, status, missing }) => ({ id, texts, types, hybrid, parents, x, y, status, missing })),
+    poems: state.poems.map(({ id, texts, types, hybrid, parents, x, y, status, missing, gift, from }) => ({ id, texts, types, hybrid, parents, x, y, status, missing, gift, from })),
     fallen: state.fallen.map(({ id, word, flowerId, key, x, b }) => ({ id, word, flowerId, key, x, b })),
     compost: state.compost,
   };
@@ -1722,7 +1886,7 @@ function importFromLegacy() {
   const legacy = readLegacy();
   if (!legacy) return false;
   const ok = importData(legacy);
-  if (ok) { try { localStorage.setItem("khuVuonDaNhap", "1"); } catch {} }
+  if (ok && !DEMO) { try { localStorage.setItem("khuVuonDaNhap", "1"); } catch {} }
   return ok;
 }
 
@@ -1761,6 +1925,7 @@ function enter(role, name, user) {
   document.body.classList.toggle("guest", role !== "owner");
   document.body.classList.remove("locked");
   $("gate").hidden = true;
+  applyRoleUI();
   startGarden();
 }
 
@@ -1819,7 +1984,7 @@ $("gate-guest").addEventListener("submit", async (e) => {
 async function leave() {
   try {
     await visitRef?.update({ leftAt: SV.TIMESTAMP });
-    await db.ref("presence/" + ME.uid).remove();
+    await (realDb || db).ref("presence/" + ME.uid).remove();
   } catch {}
   await auth.signOut();
   location.reload();
@@ -1846,6 +2011,7 @@ function startGarden() {
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("gift-overlay").hidden) closeGift();
+  else if (!$("seedgift-overlay").hidden) closeSeedGifts();
   else if (!$("log-overlay").hidden) closeLog();
   else if (!$("basket-overlay").hidden) closeBasket();
   else if (mode) setMode(null);
@@ -1866,7 +2032,7 @@ async function boot() {
   $("guest-name").value = savedName();
   try {
     const be = await initBackend();
-    db = be.db; auth = be.auth; SV = be.SV; OWNER_MAIL = be.OWNER_EMAIL; BACKEND_MODE = be.mode;
+    db = realDb = be.db; auth = be.auth; SV = be.SV; OWNER_MAIL = be.OWNER_EMAIL; BACKEND_MODE = be.mode;
   } catch (err) {
     showGate();
     $("gate-note").textContent = "Không kết nối được máy chủ: " + err.message;
