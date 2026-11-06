@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Khu vườn thơ của tôi</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="sky" aria-hidden="true"></div>
+
+  <header>
+    <h1>Khu vườn thơ của tôi</h1>
+    <p class="sub">mỗi bài thơ là một bông hoa</p>
+  </header>
+
+  <main id="garden" aria-label="Khu vườn">
+    <p id="empty-hint">Vườn còn trống. Hãy gieo hạt giống đầu tiên ✿</p>
+    <div id="ground"></div>
+  </main>
+
+  <div id="sky-dim" aria-hidden="true"></div>
+  <div id="rain" aria-hidden="true"></div>
+  <div id="bee-layer" aria-hidden="true"></div>
+  <div id="scent-layer" aria-hidden="true"></div>
+
+  <!-- Thanh công cụ -->
+  <div id="toolbar">
+    <button id="basket-btn" type="button">🧺 Giỏ <span id="basket-count">0</span></button>
+    <button id="rain-btn" type="button" title="Gọi mưa">☔</button>
+    <button id="bee-btn" type="button" title="Gọi ong đi thụ phấn">🐝</button>
+    <button id="export-btn" type="button" title="Xuất vườn ra file garden.json để đăng lên web">📤 Xuất vườn</button>
+  </div>
+
+  <div id="mode-banner" hidden>
+    <span id="mode-text"></span>
+    <button id="mode-cancel" type="button">hủy</button>
+  </div>
+
+  <!-- Thùng phân hữu cơ -->
+  <button id="bin" type="button" aria-label="Thùng rác hữu cơ">
+    <span class="bin-icon">🗑️</span>
+    <span class="bin-label">kéo phân ra bón</span>
+    <span id="bin-count">0</span>
+  </button>
+
+  <!-- Cái vợt: quét chữ rơi -->
+  <div id="net" title="Cái vợt: kéo quét qua các chữ rơi, rồi đổ vào thùng">
+    <svg viewBox="0 0 70 100" aria-hidden="true">
+      <defs><clipPath id="net-clip"><circle cx="35" cy="30" r="24"/></clipPath></defs>
+      <line x1="35" y1="56" x2="35" y2="96" stroke="#8a5a33" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="35" cy="30" r="24" fill="rgba(255,255,255,.4)"/>
+      <g clip-path="url(#net-clip)" stroke="#b69a7a" stroke-width="1.2">
+        <path d="M5 18 H65 M5 30 H65 M5 42 H65 M23 4 V56 M35 4 V56 M47 4 V56"/>
+      </g>
+      <circle cx="35" cy="30" r="26" fill="none" stroke="#8a5a33" stroke-width="4"/>
+    </svg>
+    <span id="net-count" hidden>0</span>
+  </div>
+
+  <!-- Hạt giống -->
+  <section id="seed-box">
+    <button id="seed-toggle" type="button" aria-expanded="false">🌱 Hạt giống</button>
+    <form id="seed-form" hidden>
+      <textarea id="poem-input" rows="8" placeholder="Dán bài thơ của bạn vào hạt giống này..."></textarea>
+      <button type="submit">Gieo hạt</button>
+    </form>
+  </section>
+
+  <!-- Bài thơ -->
+  <aside id="poem-panel" hidden>
+    <button id="panel-close" type="button" aria-label="Đóng">×</button>
+    <p id="poem-meta"></p>
+    <div id="poem-text"></div>
+    <p id="word-info"></p>
+    <button id="delete-btn" type="button">hái bông hoa này bỏ vào giỏ</button>
+  </aside>
+
+  <!-- Giỏ hoa -->
+  <div id="basket-overlay" hidden>
+    <div id="basket-box">
+      <button id="basket-close" type="button" aria-label="Đóng">×</button>
+      <h2>Giỏ hoa đã hái</h2>
+      <p id="basket-empty">Giỏ đang trống.</p>
+      <div id="basket-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
