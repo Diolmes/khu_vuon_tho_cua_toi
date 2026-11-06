@@ -1946,6 +1946,10 @@ function updateWho() {
   who.append(b, names.slice(0, 8).join(", ") + (names.length > 8 ? ` +${names.length - 8}` : ""));
 }
 function setPeer(uid, d) {
+  if (!d || typeof d.name !== "string" || !d.name) {       // mục presence thiếu tên (vừa bị xóa rồi ghi lại dở dang): không vẽ
+    if (peers[uid]) removePeer(uid);
+    return;
+  }
   peers[uid] = d;
   updateWho();
   const hasChar = setCharacter(uid, d);
@@ -1987,7 +1991,11 @@ function startPresence() {
     last = now;
     me.update({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight, t: now });
   }, { passive: true });
-  setInterval(() => me.update({ t: Date.now() }), 20000);       // còn ở đó
+  // còn ở đó (kèm tên, vai trò, nhân vật để dựng lại mục nếu máy chủ đã xóa khi mạng chập chờn)
+  setInterval(() => {
+    const a = isOwner() ? "" : myAvatar();
+    me.update({ t: Date.now(), name: ME.name, role: ROLE, ...(a ? { avatar: a } : {}) });
+  }, 20000);
   setInterval(() => Object.keys(cursorEls).forEach((u) => {
     cursorEls[u].classList.toggle("idle", Date.now() - (peers[u]?.t || 0) > 45000);
   }), 10000);

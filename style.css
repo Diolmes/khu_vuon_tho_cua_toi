@@ -566,8 +566,8 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 
 /* màn hình vừa: thanh công cụ dài hơn tiêu đề thì xuống ngay dưới tiêu đề, khỏi đè lên nhau */
 @media (min-width: 901px) and (max-width: 1560px) {
-  #toolbar { top: calc(58px + env(safe-area-inset-top)); left: 0; right: 0; justify-content: center; flex-wrap: wrap; gap: 6px; }
-  #mode-banner { top: calc(104px + env(safe-area-inset-top)); }
+  #toolbar { top: calc(74px + env(safe-area-inset-top)); left: 0; right: 0; justify-content: center; flex-wrap: wrap; gap: 6px; }
+  #mode-banner { top: calc(122px + env(safe-area-inset-top)); }
 }
 
 /* màn hình rất lớn */
@@ -582,13 +582,13 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
   header h1 { font-size: 1.4rem; }
   /* thanh công cụ nằm ngang, ngay dưới tiêu đề */
   #toolbar {
-    top: calc(58px + env(safe-area-inset-top));
+    top: calc(74px + env(safe-area-inset-top));
     left: 0; right: 0;
     justify-content: center;
     flex-wrap: wrap;
     gap: 6px;
   }
-  #mode-banner { top: calc(104px + env(safe-area-inset-top)); }
+  #mode-banner { top: calc(122px + env(safe-area-inset-top)); }
   #poem-panel { width: min(340px, calc(100vw - 32px)); }
 }
 
@@ -597,9 +597,9 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
   header h1 { font-size: 1.15rem; }
   .sub { font-size: .78rem; }
 
-  #toolbar { top: calc(54px + env(safe-area-inset-top)); }
+  #toolbar { top: calc(70px + env(safe-area-inset-top)); }
   #toolbar button { padding: 5px 11px; font-size: .88rem; }
-  #mode-banner { top: calc(100px + env(safe-area-inset-top)); font-size: .85rem; }
+  #mode-banner { top: calc(116px + env(safe-area-inset-top)); font-size: .85rem; }
 
   /* hàng dưới: hạt giống | vợt | thùng phân */
   #bin { width: 74px; padding: 6px 2px 5px; }
