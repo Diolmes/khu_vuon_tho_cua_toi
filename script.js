@@ -1519,18 +1519,21 @@ async function claimPollination(manual) {
   return true;
 }
 
-// Mưa: ai bấm ☔ cũng được, nhưng cách nhau ít nhất 20 phút để kịp nhặt chữ
+// Mưa: ai bấm ☔ cũng được, không giới hạn số cơn mưa trong ngày. Một cơn mưa kéo dài 10 giây;
+// đang mưa mà bấm thì chỉ nhắc, không tính vào số lần gọi.
+const RAIN_MS = 10000;
 let rainSeen = null;
 async function triggerRain(manual) {
   const myId = newId();
   rainSeen = myId;     // đánh dấu trước, kẻo listener nhìn thấy cơn mưa của chính mình rồi chạy như người ngoài
   const res = await db.ref("garden/rainNow").transaction((cur) => {
     const now = Date.now();
-    if (cur && now - cur.at < (manual ? 20 * 60000 : 60000)) return undefined;
+    if (cur && now - cur.at < (manual ? RAIN_MS : 60000)) return undefined;     // máy khác vừa gọi mưa xong
     return { at: now, id: myId, by: ME.uid };
   });
-  if (!res.committed) { if (manual) toast("Trời vừa mưa xong, chờ một lát rồi hãy gọi mưa nhé ☔"); return; }
+  if (!res.committed) { if (manual) toast("Đang mưa rồi nè ☔"); return false; }
   startRain(true);
+  return true;
 }
 
 // ---------- Bướm: bay một vòng, đậu lên bài thơ vừa được chạm tới gần nhất, rồi bay thêm một vòng ----------
@@ -1712,9 +1715,15 @@ async function checkPlans() {
 
 $("bee-btn").addEventListener("click", () => claimPollination(true));
 $("butterfly-btn").addEventListener("click", () => claimButterfly(true));
-$("rain-btn").addEventListener("click", () => {
-  if (raining) { toast("Trời đang mưa rồi."); return; }
-  triggerRain(true);
+// Gọi mưa tối đa 3 lần trong 1 phút
+const rainPress = [];
+$("rain-btn").addEventListener("click", async () => {
+  if (raining) { toast("Đang mưa rồi nè ☔"); return; }          // đang mưa thì không tính lần gọi
+  const now = Date.now();
+  while (rainPress.length && now - rainPress[0] > 60000) rainPress.shift();
+  if (rainPress.length >= 3) { toast("Mưa nhiều quá, đợi một chút rồi gọi tiếp nhé ☔"); return; }
+  rainPress.push(now);
+  if (!(await triggerRain(true))) rainPress.pop();                  // máy khác vừa gọi mưa: cũng không tính
 });
 
 // ---------- Đồng bộ với máy chủ ----------
