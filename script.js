@@ -2322,7 +2322,7 @@ function findSpot(zone, ignoreId = null, near = null) {
   return { x: 0.15, y: 0.5 };
 }
 
-// ----- Nhấn giữ một bông hoa để dời chỗ (chủ vườn) -----
+// ----- Kéo thả (hoặc nhấn giữ rồi kéo) một bông hoa để dời chỗ (chủ vườn) -----
 let suppressClickUntil = 0;
 let holdHinted = false;
 function startFlowerHold(e, id, el) {
@@ -2335,8 +2335,19 @@ function startFlowerHold(e, id, el) {
     document.removeEventListener("pointerup", up);
     document.removeEventListener("pointercancel", up);
   };
+  // bắt đầu cầm hoa: hoặc kéo ngay (kéo thả), hoặc nhấn giữ nửa giây rồi kéo
+  const begin = () => {
+    if (dragging) return;
+    clearTimeout(timer);
+    dragging = true;
+    closePanel();
+    el.classList.add("moving");
+    document.body.classList.add("dragging-flower");
+    try { navigator.vibrate && navigator.vibrate(25); } catch {}
+    if (!holdHinted) { holdHinted = true; toast("Đang cầm bông hoa: kéo tới chỗ mới rồi thả tay"); }
+  };
   const move = (ev) => {
-    if (!dragging) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) cleanup(); return; }   // di chuyển trước khi đủ lâu: không phải nhấn giữ
+    if (!dragging) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) begin(); else return; }
     const p = getPoem(id), vh = window.innerHeight;
     if (!p) return;
     pos = { x: clamp(ev.clientX / window.innerWidth, 0.04, 0.96), y: clamp((vh - ev.clientY - 10) / (vh * 0.42), 0, 1) };
@@ -2347,6 +2358,7 @@ function startFlowerHold(e, id, el) {
     cleanup();
     if (!dragging) return;
     el.classList.remove("moving", "blocked");
+    document.body.classList.remove("dragging-flower");
     suppressClickUntil = Date.now() + 400;
     if (pos && onRoad(pos.x, pos.y)) {
       const p = getPoem(id);
@@ -2358,13 +2370,7 @@ function startFlowerHold(e, id, el) {
       toast("Đã dời bông hoa 🌷");
     }
   };
-  timer = setTimeout(() => {
-    dragging = true;
-    closePanel();
-    el.classList.add("moving");
-    try { navigator.vibrate && navigator.vibrate(25); } catch {}
-    if (!holdHinted) { holdHinted = true; toast("Đang cầm bông hoa: kéo tới chỗ mới rồi thả tay"); }
-  }, 520);
+  timer = setTimeout(begin, 520);
   document.addEventListener("pointermove", move);
   document.addEventListener("pointerup", up);
   document.addEventListener("pointercancel", up);

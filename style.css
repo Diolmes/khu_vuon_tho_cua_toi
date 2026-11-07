@@ -1319,3 +1319,5 @@ body.locked #zone-nav { visibility: hidden; }
 .md-table table { border-collapse: collapse; font-size: .88rem; }
 .md-table th, .md-table td { border: 1px solid #eadfcc; padding: 4px 9px; text-align: left; vertical-align: top; }
 .md-table th { background: #fff3d6; font-weight: normal; }
+
+body.dragging-flower, body.dragging-flower * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
