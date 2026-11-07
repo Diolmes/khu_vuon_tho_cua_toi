@@ -18,6 +18,10 @@ const binEl = $("bin");
 let ROLE = null;      // "owner" | "guest"
 let ME = null;        // { uid, name }
 let db = null, auth = null, SV = null, OWNER_MAIL = "", BACKEND_MODE = "mock";
+// Vườn vô tận chia theo năm: mỗi khu là một năm. Bài chưa có ngày viết nằm ở khu mới nhất; điền ngày rồi thì về khu của năm đó.
+let curZone = new Date().getFullYear();          // khu đang đứng (= năm)
+let followNewest = true;                         // true: luôn đứng ở khu mới nhất
+(() => { try { const z = parseInt(sessionStorage.getItem("khuVuonKhu"), 10); if (z) { curZone = z; followNewest = false; } } catch {} })();
 let realDb = null;    // máy chủ thật; `db` bị tráo sang bộ nhớ tạm khi khách "hóa thân chủ vườn" (DEMO)
 let DEMO = false;
 const isOwner = () => ROLE === "owner";
@@ -291,6 +295,8 @@ function normPoem(p) {
     missing: p.missing || [],
     gift: !!p.gift,
     from: p.from || "",
+    zone: 0,
+    written: p.written || "",
   };
 }
 function poemFromDb(id, d) {
@@ -306,6 +312,8 @@ function poemFromDb(id, d) {
     missing: Object.keys(d.missing || {}),
     gift: !!d.gift,
     from: d.from || "",
+    zone: 0,
+    written: d.written || "",
     t: d.t || 0,
   };
 }
@@ -313,6 +321,7 @@ function poemToDb(p) {
   const o = { texts: p.texts, types: p.types, hybrid: !!p.hybrid, x: p.x, y: p.y, status: p.status || "garden", t: Date.now() };
   if (p.parents) o.parents = p.parents;
   if (p.gift) { o.gift = true; o.from = p.from || ""; }
+  if (p.written) o.written = p.written;
   if (p.missing && p.missing.length) { o.missing = {}; p.missing.forEach((k) => { o.missing[k] = true; }); }
   return o;
 }
@@ -405,8 +414,10 @@ function renderFlower(p, animate) {
   el.addEventListener("animationend", (e) => {
     if (e.target === el) el.classList.add("settled");
   });
-  el.addEventListener("click", () => openPoem(p.id));
-  el.addEventListener("pointerenter", () => emitScent(p.id));
+  el.addEventListener("click", () => { if (Date.now() < suppressClickUntil) return; openPoem(p.id); });
+  el.addEventListener("pointerenter", () => { if (!el.classList.contains("moving")) emitScent(p.id); });
+  el.addEventListener("pointerdown", (e) => startFlowerHold(e, p.id, el));          // nhấn giữ để dời chỗ (chủ vườn)
+  el.addEventListener("contextmenu", (e) => { if (isOwner()) e.preventDefault(); });
   gardenEl.appendChild(el);
   return el;
 }
@@ -474,7 +485,7 @@ function emitScent(id) {
 }
 
 function refreshHint() {
-  hintEl.classList.toggle("gone", state.poems.some((p) => p.status === "garden"));
+  hintEl.classList.toggle("gone", state.poems.some((p) => p.status === "garden" && p.zone === curZone));
 }
 
 let toastTimer;
@@ -511,12 +522,14 @@ gardenEl.addEventListener("click", (e) => {
   e.stopPropagation();
   e.preventDefault();
   const p = getPoem(mode.id);
-  setMode(null);
-  if (!p) return;
+  if (!p) { setMode(null); return; }
   const vh = window.innerHeight;
+  const nx = clamp(e.clientX / window.innerWidth, 0.04, 0.96), ny = clamp((vh - e.clientY - 10) / (vh * 0.42), 0, 1);
+  if (onRoad(nx, ny)) { toast("Đó là đường đi, chọn chỗ khác nhé 🚫"); return; }       // vẫn giữ chế độ trồng lại để chọn lại
+  setMode(null);
   db.ref("garden/poems/" + p.id).update({
-    x: clamp(e.clientX / window.innerWidth, 0.04, 0.96),
-    y: clamp((vh - e.clientY - 10) / (vh * 0.42), 0, 1),
+    x: nx,
+    y: ny,
     status: "garden",
     t: Date.now(),
   });
@@ -534,14 +547,17 @@ seedToggle.addEventListener("click", () => {
 
 // Gieo một hạt: tạo bài thơ rồi cho hạt rơi xuống, hoa nở. extra = { gift: true, from } cho hạt được tặng.
 function sowSeed(text, extra = {}) {
+  if (curZone !== newestZone()) goNewest();            // hoa mới chưa có ngày viết nên mọc ở khu mới nhất: đưa người gieo tới đó
+  const spot = findSpot(newestZone());                 // chỗ thoáng, không trên đường đi, không đè lên hoa khác
   const p = {
     id: newId(),
     texts: [text],
     types: [nextType()],
     hybrid: false,
     parents: null,
-    x: 0.06 + Math.random() * 0.88,
-    y: Math.random(),
+    x: spot.x,
+    y: spot.y,
+    zone: newestZone(),
     status: "garden",
     missing: [],
     t: Date.now(),
@@ -672,13 +688,17 @@ function openPoem(id, fromBasket = false) {
   pickedWord = null;
   if (!fromBasket) touchPoem(id);
   renderPoem(p);
+  setupPanelExtras(p, fromBasket);
   panel.hidden = false;
   panel.style.animation = "none"; panel.offsetHeight; panel.style.animation = "";
   applyGlow();
 }
 
 function renderPoem(p) {
-  poemMeta.textContent = p.gift ? `🎁 hạt giống tặng từ ${p.from || "một người bạn"}` : p.hybrid ? "chùm thơ lai · 2 bài" : "";
+  poemMeta.textContent = [
+    p.gift ? `🎁 hạt giống tặng từ ${p.from || "một người bạn"}` : p.hybrid ? "chùm thơ lai · 2 bài" : "",
+    p.written ? `viết ngày ${fmtWritten(p.written)}` : "",
+  ].filter(Boolean).join(" · ");
   poemText.innerHTML = "";
   p.texts.forEach((text, pi) => {
     if (pi > 0) {
@@ -725,6 +745,8 @@ document.querySelectorAll("#align-bar button").forEach((b) => b.addEventListener
 applyAlign();
 
 function closePanel() {
+  stopReactions();
+  $("react-msg").hidden = true;
   panel.hidden = true;
   panelFromBasket = false;
   openId = null;
@@ -768,9 +790,11 @@ function applyGlow() {
     el.classList.toggle("active", el.dataset.id === openId && !pickedWord);
   });
 
+  const elsewhere = pickedWord ? state.poems.filter((p) => p.status === "garden" && p.zone !== curZone && wordsOf(p).has(pickedWord)).length : 0;
   wordInfo.textContent = pickedWord
-    ? `"${pickedWord}" nở trong ${count} bông hoa`
+    ? `"${pickedWord}" nở trong ${count} bông hoa` + (elsewhere ? ` (và ${elsewhere} bông ở khu khác)` : "")
     : "chạm vào một từ để xem những bông hoa cùng từ ấy";
+  renderZonePreviews();
 }
 
 // ---------- Giỏ hoa ----------
@@ -1466,7 +1490,7 @@ async function visit(bee, id) {
 
 // chỉ hoa thường mới được làm bố mẹ, và mỗi cặp chỉ có một hoa con
 function pickPair() {
-  const parents = state.poems.filter((p) => p.status === "garden" && !p.hybrid && !p.gift);
+  const parents = state.poems.filter((p) => p.status === "garden" && p.zone === curZone && !p.hybrid && !p.gift);
   const pairs = [];
   for (let i = 0; i < parents.length; i++) {
     for (let j = i + 1; j < parents.length; j++) {
@@ -1498,6 +1522,13 @@ async function runPollination(momId, dadId, spawn) {
   }
 }
 
+// chỗ cho hoa con: giữa hai bông bố mẹ nếu còn thoáng, không thì chỗ trống gần đó (không trên đường đi)
+function childSpot(mom, dad) {
+  const mx = clamp((mom.x + dad.x) / 2 + rand(-0.03, 0.03), 0.06, 0.94);
+  const my = clamp((mom.y + dad.y) / 2 + rand(-0.08, 0.08), 0, 1);
+  if (!onRoad(mx, my) && spotScore(mx, my, mom.zone) >= 1) return { x: mx, y: my };
+  return findSpot(mom.zone, null, { x: mx, y: my });
+}
 function spawnChild(mom, dad) {
   const child = {
     id: newId(),
@@ -1505,10 +1536,10 @@ function spawnChild(mom, dad) {
     types: [mom.types[0], dad.types[0]],
     hybrid: true,
     parents: [mom.id, dad.id],
-    x: clamp((mom.x + dad.x) / 2 + rand(-0.03, 0.03), 0.06, 0.94),
-    y: clamp((mom.y + dad.y) / 2 + rand(-0.08, 0.08), 0, 1),
+    ...childSpot(mom, dad),
     status: "garden",
     missing: [],
+    written: mom.written || "",          // cùng khu (cùng năm) với bố mẹ
   };
   db.ref("garden/poems/" + child.id).set(poemToDb(child));
   setTimeout(() => { const pt = headPoint(child.id); if (pt) puff(pt, "✨"); }, 600);
@@ -1588,7 +1619,7 @@ function animate(ms, fn) {
 
 // bài thơ để bướm đậu: bài được chạm tới (mở đọc, bón phân, trồng lại, gieo) gần nhất
 function pickButterflyTarget() {
-  const garden = state.poems.filter((p) => p.status === "garden");
+  const garden = state.poems.filter((p) => p.status === "garden" && p.zone === curZone);
   if (!garden.length) return null;
   const t = state.touch;
   if (t && garden.some((p) => p.id === t.id)) return t.id;
@@ -1602,7 +1633,38 @@ const BTF_MAX = 3;            // tối đa 3 con bướm trong vườn cùng lú
 const BTF_LIFE = 42000;       // một chuyến bay dài tối đa chừng này mili giây (quá hạn thì coi như đã bay đi, đề phòng máy gọi bướm bị tắt giữa chừng)
 const BTF_SLOT_DELAY = 3000;  // bướm bay khỏi màn hình rồi, chờ chừng này mili giây mới trả chỗ
 const btfActive = new Set();
+
+// Bộ điều khiển một con bướm: đặt chỗ, bay lượn tới một điểm, bay một vòng elip
+function makeFlyer(el, x0, y0) {
+  const f = { x: x0, y: y0, dir: 1, t: Math.random() * 6 };
+  f.place = (x, y) => {
+    if (Math.abs(x - f.x) > 0.3) f.dir = x > f.x ? 1 : -1;
+    f.x = x; f.y = y; f.t += 0.016;
+    const wob = el.classList.contains("landed") ? 0 : Math.sin(f.t * 9) * 4;
+    el.style.transform = `translate(${x - 19}px, ${y - 17 + wob}px) scaleX(${f.dir})`;
+  };
+  f.flyTo = (x, y) => {
+    const x0 = f.x, y0 = f.y, d = Math.hypot(x - x0, y - y0);
+    const nx = d ? -(y - y0) / d : 0, ny = d ? (x - x0) / d : 0;          // hướng vuông góc để lượn sóng
+    return animate(clamp(d / 140, 0.9, 4.5) * 1000, (u) => {
+      const e = u * u * (3 - 2 * u), w = Math.sin(u * Math.PI * 3) * 16 * Math.sin(u * Math.PI);
+      f.place(x0 + (x - x0) * e + nx * w, y0 + (y - y0) * e + ny * w);
+    });
+  };
+  // bay một vòng elip: bắt đầu từ góc a0 (0 = bên phải, π/2 = phía dưới, π = bên trái)
+  f.orbit = async (cx, cy, rx, ry, a0, ms, spin = 1) => {
+    const at = (a) => ({ x: clamp(cx + Math.cos(a) * rx, 24, window.innerWidth - 24), y: Math.max(70, cy + Math.sin(a) * ry) });
+    const s = at(a0);
+    if (Math.hypot(s.x - f.x, s.y - f.y) > 8) await f.flyTo(s.x, s.y);
+    await animate(ms, (u) => { const p = at(a0 + spin * u * Math.PI * 2); f.place(p.x, p.y); });
+  };
+  f.place(x0, y0);
+  return f;
+}
+
 async function runButterfly(poemId, seedId = "", owned = false) {
+  const pm = getPoem(poemId);
+  if (pm && pm.zone !== curZone) return;                 // bài ở khu khác: khu này không thấy bướm
   if (btfActive.has(seedId)) return;
   btfActive.add(seedId);
   const el = document.createElement("div");
@@ -1613,51 +1675,28 @@ async function runButterfly(poemId, seedId = "", owned = false) {
   el.style.setProperty("--bw2", c2);
   $("bee-layer").appendChild(el);
   const vw = window.innerWidth, vh = window.innerHeight;
-  const pos = { x: -50, y: vh * rand(0.35, 0.55), dir: 1, t: 0 };
+  const f = makeFlyer(el, -50, vh * rand(0.35, 0.55));
   const spin = Math.random() < 0.5 ? 1 : -1;                  // mỗi con lượn theo một chiều
   const off = { x: rand(-14, 14), y: rand(-3, 3) };           // đậu lệch nhau chút nếu cùng một bài
-  const place = (x, y) => {
-    if (Math.abs(x - pos.x) > 0.3) pos.dir = x > pos.x ? 1 : -1;
-    pos.x = x; pos.y = y; pos.t += 0.016;
-    const wob = el.classList.contains("landed") ? 0 : Math.sin(pos.t * 9) * 4;
-    el.style.transform = `translate(${x - 19}px, ${y - 17 + wob}px) scaleX(${pos.dir})`;
-  };
-  const flyTo = (x, y) => {
-    const x0 = pos.x, y0 = pos.y, d = Math.hypot(x - x0, y - y0);
-    const nx = d ? -(y - y0) / d : 0, ny = d ? (x - x0) / d : 0;          // hướng vuông góc để lượn sóng
-    return animate(clamp(d / 140, 0.9, 4.5) * 1000, (u) => {
-      const e = u * u * (3 - 2 * u), w = Math.sin(u * Math.PI * 3) * 16 * Math.sin(u * Math.PI);
-      place(x0 + (x - x0) * e + nx * w, y0 + (y - y0) * e + ny * w);
-    });
-  };
-  // bay một vòng elip: bắt đầu từ góc `a0` (0 = bên phải, π/2 = phía dưới, π = bên trái)
-  const orbit = async (cx, cy, rx, ry, a0, ms) => {
-    rx *= rand(0.85, 1.15); ry *= rand(0.85, 1.15);
-    const at = (a) => ({ x: clamp(cx + Math.cos(a) * rx, 24, window.innerWidth - 24), y: Math.max(70, cy + Math.sin(a) * ry) });
-    const s = at(a0);
-    if (Math.hypot(s.x - pos.x, s.y - pos.y) > 8) await flyTo(s.x, s.y);
-    await animate(ms, (u) => { const p = at(a0 + spin * u * Math.PI * 2); place(p.x, p.y); });
-  };
-
   try {
     // 1) vào vườn, bay một vòng quanh khu vườn
-    await orbit(vw / 2, vh * 0.5, vw * 0.34, vh * 0.17, Math.PI, 6500);
+    await f.orbit(vw / 2, vh * 0.5, vw * rand(0.28, 0.38), vh * rand(0.13, 0.2), Math.PI, 6500, spin);
     // 2) đậu lên bài thơ
     let h = headPoint(poemId);
     if (h) {
-      await flyTo(h.x + off.x, h.y - 6 + off.y);
+      await f.flyTo(h.x + off.x, h.y - 6 + off.y);
       el.classList.add("landed");
       emitScent(poemId);
       await animate(8500, (u) => {
         const n = headPoint(poemId);
-        if (n) { h = n; place(n.x + off.x + Math.sin(u * 40) * 1.2, n.y - 6 + off.y); }
+        if (n) { h = n; f.place(n.x + off.x + Math.sin(u * 40) * 1.2, n.y - 6 + off.y); }
       });
       el.classList.remove("landed");
       // 3) cất cánh, bay thêm một vòng quanh bông hoa
-      await orbit(h.x, h.y - 70, 150, 70, Math.PI / 2, 5500);
+      await f.orbit(h.x, h.y - 70, 150 * rand(0.85, 1.15), 70 * rand(0.85, 1.15), Math.PI / 2, 5500, spin);
     }
     // 4) bay đi
-    await flyTo(window.innerWidth + 60, pos.y - 90);
+    await f.flyTo(window.innerWidth + 60, f.y - 90);
   } finally {
     el.remove();
     btfActive.delete(seedId);
@@ -1672,7 +1711,6 @@ let btfSeen = new Set();
 const btfPress = [];
 async function claimButterfly(manual) {
   if (manual) {
-    if (!isOwner()) return false;
     const now = Date.now();
     while (btfPress.length && now - btfPress[0] > 60000) btfPress.shift();
     btfPress.push(now);
@@ -1761,7 +1799,8 @@ function applyPoem(id, d) {
   let p = getPoem(id);
   if (p) Object.assign(p, np);
   else { p = np; state.poems.push(p); }
-  if (p.status === "garden") {
+  const shifted = recomputeZones().some((x) => x !== id);       // bài khác đổi khu (khu mới nhất dịch chuyển)
+  if (p.status === "garden" && p.zone === curZone) {
     if (!holdRender.has(id)) {
       const el = flowerEl(id);
       if (!el) { renderFlower(p, Date.now() - (p.t || 0) < 15000); applyGlow(); }
@@ -1775,10 +1814,13 @@ function applyPoem(id, d) {
     flowerEl(id)?.remove();
     if (openId === id) { if (panelFromBasket) renderPoem(p); else closePanel(); }
   }
+  if (shifted) refreshZoneView();
+  syncFallen();
   refreshAfterPoems();
 }
 function removePoem(id) {
   state.poems = state.poems.filter((p) => p.id !== id);
+  if (recomputeZones().length) refreshZoneView();
   flowerEl(id)?.remove();
   if (openId === id) closePanel();
   refreshAfterPoems();
@@ -1787,7 +1829,16 @@ function onFallenAdded(id, d) {
   if (state.fallen.some((f) => f.id === id)) return;
   const f = { id, word: d.word, flowerId: d.flowerId, key: d.key, x: d.x, b: d.b, t: d.t || 0 };
   state.fallen.push(f);
-  renderFallen(f, Date.now() - f.t < 8000 ? headPoint(f.flowerId) : null);
+  const fl = getPoem(f.flowerId);
+  if (!fl || fl.zone === curZone) renderFallen(f, Date.now() - f.t < 8000 ? headPoint(f.flowerId) : null);
+}
+// chữ rơi chỉ hiện ở khu có bông hoa của nó
+function syncFallen() {
+  const want = new Set(state.fallen.filter((f) => { const fl = getPoem(f.flowerId); return !fl || fl.zone === curZone; }).map((f) => f.id));
+  gardenEl.querySelectorAll(".fallen").forEach((el) => {
+    if (!want.has(el.dataset.id) && !el.classList.contains("scooped") && !el.classList.contains("dragging")) el.remove();
+  });
+  state.fallen.forEach((f) => { if (want.has(f.id) && !fallenEl(f.id)) renderFallen(f, null); });
 }
 function onFallenChanged(id, d) {
   const f = state.fallen.find((x) => x.id === id);
@@ -1843,6 +1894,10 @@ function attachSync() {
   listen(db.ref("garden/butterfly"), "child_added", (s) => {      // có con bướm mới: ai trong vườn cũng thấy
     const v = s.val();
     if (v && v.poem && !btfSeen.has(s.key) && Date.now() - v.at < 12000) { btfSeen.add(s.key); runButterfly(v.poem, s.key); }
+  });
+  listen(db.ref("garden/praise"), "child_added", (s) => {        // có người khen hoa: đàn bướm bay tới
+    const v = s.val();
+    if (v && v.poem && !praiseSeen.has(s.key) && Date.now() - v.at < 12000) { praiseSeen.add(s.key); runPraiseFlock(v.poem); }
   });
   // hộp hạt giống tặng: chỉ chủ vườn đọc được (luật máy chủ cũng chặn khách)
   if (isOwner()) listen(db.ref("gifts"), "value", (s) => { state.gifts = s.val() || {}; updateGiftsCount(); });
@@ -1927,7 +1982,7 @@ async function enterDemo() {
   let snap;
   try { snap = (await db.ref("garden").once("value")).val() || {}; }
   catch { toast("Chưa tải được vườn để thử, bạn thử lại nhé."); return; }
-  delete snap.plan; delete snap.rainNow; delete snap.bee; delete snap.butterfly;      // để khách tự thử gọi mưa, gọi ong, gọi bướm
+  delete snap.plan; delete snap.rainNow; delete snap.bee; delete snap.butterfly; delete snap.praise;      // để khách tự thử gọi mưa, gọi ong, gọi bướm
   resetGardenView();
   realDb = realDb || db;
   db = makeMemoryDb({ garden: snap });
@@ -1960,6 +2015,511 @@ function exitDemo() {
 }
 $("demo-btn").addEventListener("click", enterDemo);
 $("demo-exit").addEventListener("click", exitDemo);
+
+// ================= Vườn vô tận: mỗi khu là một năm =================
+const pad2 = (n) => String(n).padStart(2, "0");
+const yearOf = (w) => { const m = /^(\d{4})-/.exec(w || ""); return m ? parseInt(m[1], 10) : 0; };
+function newestZone() {
+  let n = new Date().getFullYear();
+  state.poems.forEach((p) => { if (p.status === "garden") { const y = yearOf(p.written); if (y > n) n = y; } });
+  return n;
+}
+// khu của mỗi bài = năm viết; chưa có ngày viết thì ở khu mới nhất. Trả về danh sách bài vừa đổi khu.
+function recomputeZones() {
+  const newest = newestZone(), changed = [];
+  state.poems.forEach((p) => {
+    const z = yearOf(p.written) || newest;
+    if (p.zone !== z) { p.zone = z; changed.push(p.id); }
+  });
+  if (followNewest && curZone !== newest) { curZone = newest; changed.push("*"); updateZoneUI(); }
+  return changed;
+}
+// Làm cho hoa trên màn hình khớp với khu đang đứng
+function refreshZoneView(animate = false) {
+  gardenEl.querySelectorAll(".flower").forEach((el) => {
+    const p = getPoem(el.dataset.id);
+    if (!p || p.status !== "garden" || p.zone !== curZone) el.remove();
+  });
+  state.poems.forEach((p) => {
+    if (p.status === "garden" && p.zone === curZone && !flowerEl(p.id) && !holdRender.has(p.id)) renderFlower(p, animate);
+  });
+  syncFallen();
+  applyGlow();
+  refreshHint();
+}
+function updateZoneUI() {
+  const newest = newestZone();
+  $("zone-label").textContent = "Khu " + curZone + (curZone === newest ? " · mới nhất" : "");
+  $("zone-newer").disabled = curZone >= newest;
+}
+function showZoneFlash() {
+  const f = $("zone-flash");
+  f.textContent = "Khu " + curZone;
+  f.classList.remove("show"); f.offsetWidth; f.classList.add("show");
+}
+function switchZone(n, flash = true) {
+  const newest = newestZone();
+  n = clamp(Math.round(n), 1, newest);
+  if (n === curZone) return;
+  closePanel(); setMode(null);
+  curZone = n;
+  followNewest = n === newest;
+  try { followNewest ? sessionStorage.removeItem("khuVuonKhu") : sessionStorage.setItem("khuVuonKhu", String(n)); } catch {}
+  gardenEl.querySelectorAll(".flower, .fallen, .seed").forEach((el) => el.remove());
+  holdRender.clear();
+  refreshZoneView(true);
+  updateZoneUI();
+  if (flash) showZoneFlash();
+}
+const goNewest = () => switchZone(newestZone());
+$("zone-older").addEventListener("click", () => switchZone(curZone - 1));
+$("zone-newer").addEventListener("click", () => switchZone(curZone + 1));
+$("zone-label").addEventListener("click", () => {
+  const v = parseInt(prompt("Đến khu (nhập năm, ví dụ 2023):", String(curZone)), 10);
+  if (!v) return;
+  if (v < 1 || v > newestZone()) { toast(`Khu mới nhất là ${newestZone()}.`); return; }
+  switchZone(v);
+});
+updateZoneUI();
+
+const anyOverlayOpen = () => !$("gate").hidden ||
+  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay"].some((id) => !$(id).hidden);
+
+// Cuộn chuột / trượt ngón tay để đi giữa các khu: cuộn xuống = lùi về khu cũ hơn ("phía sau" khu vườn)
+let wheelAcc = 0, wheelLocked = false, wheelTimer = null;
+document.addEventListener("wheel", (e) => {
+  if (anyOverlayOpen() || e.target.closest("#poem-panel, #seed-form, #zone-previews, textarea")) return;
+  clearTimeout(wheelTimer);
+  wheelTimer = setTimeout(() => { wheelLocked = false; wheelAcc = 0; }, 260);      // hết đà cuộn thì mở khóa
+  if (wheelLocked) return;
+  wheelAcc += e.deltaY;
+  if (Math.abs(wheelAcc) > 70) {
+    wheelLocked = true;
+    switchZone(curZone + (wheelAcc > 0 ? -1 : 1));
+    wheelAcc = 0;
+  }
+}, { passive: true });
+let swipe = null;
+gardenEl.addEventListener("pointerdown", (e) => {
+  if (e.pointerType !== "touch" || e.target.closest(".flower, .fallen") || mode) return;
+  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY };
+});
+gardenEl.addEventListener("pointerup", (e) => {
+  if (!swipe || swipe.id !== e.pointerId) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dy) > 70 && Math.abs(dy) > Math.abs(dx) * 1.5) switchZone(curZone + (dy < 0 ? -1 : 1));
+});
+gardenEl.addEventListener("pointercancel", () => { swipe = null; });
+
+// Đến thẳng một bài thơ (từ tìm kiếm / khung preview)
+function goToPoem(id, word = null) {
+  const p = getPoem(id);
+  if (!p || p.status !== "garden") return;
+  closeSearch();
+  switchZone(p.zone, false);
+  if (p.zone !== curZone) return;
+  if (!flowerEl(id)) refreshZoneView(false);
+  openPoem(id);
+  if (word) { pickedWord = word; renderPoem(p); applyGlow(); }
+  const el = flowerEl(id);
+  if (el) { el.classList.add("praised"); setTimeout(() => el.classList.remove("praised"), 3200); }
+}
+
+// ----- Khung preview nhỏ: bông hoa có chữ đang chọn nhưng nằm ở khu khác -----
+function wordSnippet(p, word) {
+  const lines = tidyLines(p.texts[0]).filter((l) => l.length);
+  let line = lines.find((l) => l.some((w) => !w.ws && normalize(w.t) === word)) || lines[0] || [];
+  const box = document.createElement("span");
+  box.className = "zp-text";
+  line.forEach((w) => {
+    if (w.ws) { box.append(" "); return; }
+    if (normalize(w.t) === word) { const m = document.createElement("mark"); m.textContent = w.t; box.append(m); }
+    else box.append(w.t);
+  });
+  return box;
+}
+function renderZonePreviews() {
+  const box = $("zone-previews");
+  box.innerHTML = "";
+  const others = pickedWord
+    ? state.poems.filter((p) => p.status === "garden" && p.zone !== curZone && wordsOf(p).has(pickedWord))
+        .sort((a, b) => Math.abs(a.zone - curZone) - Math.abs(b.zone - curZone))
+    : [];
+  box.hidden = !others.length;
+  if (!others.length) return;
+  const h = document.createElement("div");
+  h.className = "zp-title";
+  h.textContent = `"${pickedWord}" cũng nở ở khu khác`;
+  box.appendChild(h);
+  others.slice(0, 4).forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "zp-card";
+    const z = document.createElement("b");
+    z.textContent = "Khu " + p.zone;
+    b.append(z, wordSnippet(p, pickedWord));
+    b.addEventListener("click", () => goToPoem(p.id, pickedWord));
+    box.appendChild(b);
+  });
+  if (others.length > 4) {
+    const more = document.createElement("div");
+    more.className = "zp-more";
+    more.textContent = `và ${others.length - 4} bông nữa`;
+    box.appendChild(more);
+  }
+}
+
+// ----- Tìm hoa theo từ khóa (không phân biệt dấu) -----
+function foldMap(text) {
+  let f = "";
+  const map = [];
+  for (let i = 0; i < text.length; i++) {
+    const g = text[i].normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/đ/g, "d");
+    for (const ch of g) { f += ch; map.push(i); }
+  }
+  return { f, map };
+}
+const foldText = (t) => foldMap(t).f;
+function searchSnippet(text, toks) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const line = lines.find((l) => toks.some((t) => foldText(l).includes(t))) || lines[0] || "";
+  const shown = line.length > 90 ? line.slice(0, 89) + "…" : line;
+  const { f, map } = foldMap(shown);
+  const ranges = [];
+  toks.forEach((t) => {
+    for (let i = f.indexOf(t); i >= 0; i = f.indexOf(t, i + t.length)) {
+      let end = map[i + t.length - 1] + 1;
+      while (end < shown.length && /\p{M}/u.test(shown[end])) end++;
+      ranges.push([map[i], end]);
+    }
+  });
+  ranges.sort((a, b) => a[0] - b[0]);
+  const span = document.createElement("span");
+  let pos = 0;
+  ranges.forEach(([a, b]) => {
+    if (a < pos) return;
+    span.append(shown.slice(pos, a));
+    const m = document.createElement("mark");
+    m.textContent = shown.slice(a, b);
+    span.append(m);
+    pos = b;
+  });
+  span.append(shown.slice(pos));
+  return span;
+}
+function renderSearch() {
+  const q = $("search-input").value.trim();
+  const list = $("search-list");
+  list.innerHTML = "";
+  const toks = foldText(q).split(/\s+/).filter(Boolean);
+  if (!toks.length) { $("search-empty").hidden = false; $("search-empty").textContent = "Gõ một từ để tìm những bông hoa có từ ấy, ở mọi khu."; return; }
+  const hits = state.poems
+    .filter((p) => p.status === "garden" && toks.every((t) => foldText(p.texts.join("\n")).includes(t)))
+    .sort((a, b) => Math.abs(a.zone - curZone) - Math.abs(b.zone - curZone) || (b.t || 0) - (a.t || 0));
+  $("search-empty").hidden = hits.length > 0;
+  $("search-empty").textContent = "Không có bông hoa nào có từ này.";
+  hits.slice(0, 40).forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sr-item";
+    const z = document.createElement("b");
+    z.textContent = "Khu " + p.zone;
+    b.append(z, searchSnippet(p.texts.join("\n"), toks));
+    b.addEventListener("click", () => goToPoem(p.id));
+    list.appendChild(b);
+  });
+  if (hits.length > 40) { const m = document.createElement("div"); m.className = "zp-more"; m.textContent = `và ${hits.length - 40} bông nữa, gõ thêm để lọc`; list.appendChild(m); }
+}
+function openSearch() {
+  if (anyOverlayOpen()) return;
+  $("search-overlay").hidden = false;
+  $("search-input").value = "";
+  renderSearch();
+  setTimeout(() => $("search-input").focus(), 50);
+}
+function closeSearch() { $("search-overlay").hidden = true; }
+$("search-btn").addEventListener("click", openSearch);
+$("search-input").addEventListener("input", renderSearch);
+$("search-close").addEventListener("click", closeSearch);
+$("search-overlay").addEventListener("click", (e) => { if (e.target === $("search-overlay")) closeSearch(); });
+
+// ----- Đường đi: hoa không được mọc trên đường -----
+// Hai mép đường lấy từ đúng đường cong SVG vẽ ở makeScenery (hệ tọa độ 0..100, v = 0 là chân trời, 100 là đáy màn hình)
+const ROAD = (() => {
+  const bez = (p0, p1, p2, p3, n = 30) => {
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, m = 1 - t;
+      out.push([
+        m * m * m * p0[0] + 3 * m * m * t * p1[0] + 3 * m * t * t * p2[0] + t * t * t * p3[0],
+        m * m * m * p0[1] + 3 * m * m * t * p1[1] + 3 * m * t * t * p2[1] + t * t * t * p3[1],
+      ]);
+    }
+    return out;
+  };
+  const left = [].concat(bez([40, 100], [42, 82], [58, 74], [54, 58]), bez([54, 58], [51, 46], [44, 40], [49, 26]), bez([49, 26], [51, 20], [53, 14], [53.5, 8]));
+  const right = [].concat(bez([55.5, 8], [56, 14], [59, 22], [58, 28]), bez([58, 28], [56, 42], [70, 48], [70, 62]), bez([70, 62], [70, 78], [62, 88], [66, 100]));
+  const at = (pts, v) => {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+      if (y1 !== y2 && (y1 - v) * (y2 - v) <= 0) return x1 + ((x2 - x1) * (v - y1)) / (y2 - y1);
+    }
+    return null;
+  };
+  return (v) => { const l = at(left, v), r = at(right, v); return l == null || r == null ? null : [l, r]; };
+})();
+// gốc hoa (x, y của bài thơ) có rơi vào đường đi không (chừa một nửa bề rộng bông hoa ra hai bên)
+function onRoad(x, y) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const v = 100 - ((10 + y * vh * 0.42) / (vh * 0.55)) * 100;
+  const r = ROAD(v);
+  if (!r) return false;
+  const half = (((80 + y * 70) * flowerScale() * 0.35) / vw) * 100;
+  const px = x * 100;
+  return px > r[0] - half && px < r[1] + half;
+}
+
+// ----- Chỗ trồng thoáng: không trồng sát hoặc đè lên nhau, chỉ chen vào khi hết chỗ -----
+function spotScore(x, y, zone, ignoreId) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = (yy) => (80 + yy * 70) * flowerScale();
+  let best = Infinity;
+  state.poems.forEach((q) => {
+    if (q.status !== "garden" || q.zone !== zone || q.id === ignoreId) return;
+    const s = (w(y) + w(q.y)) / 2;
+    const dx = ((x - q.x) * vw) / (s * 0.95);
+    const dy = ((y - q.y) * vh * 0.42) / (s * 0.55);
+    best = Math.min(best, Math.hypot(dx, dy));
+  });
+  return best;      // >= 1: hai bông không chạm nhau
+}
+function findSpot(zone, ignoreId = null, near = null) {
+  const tryNear = (n) => {
+    let best = null, bestS = -1;
+    const good = [];
+    for (let i = 0; i < 90; i++) {
+      const c = n
+        ? { x: clamp(n.x + rand(-0.12, 0.12), 0.06, 0.94), y: clamp(n.y + rand(-0.25, 0.25), 0, 1) }
+        : { x: 0.06 + Math.random() * 0.88, y: Math.random() };
+      if (onRoad(c.x, c.y)) continue;                    // không bao giờ trồng trên đường đi
+      const s = spotScore(c.x, c.y, zone, ignoreId);
+      if (s >= 1.15) good.push(c);
+      if (s > bestS) { bestS = s; best = c; }
+    }
+    return { good, best, bestS };
+  };
+  let r = near ? tryNear(near) : tryNear(null);
+  if (near && !r.good.length) r = tryNear(null);
+  if (r.good.length) return r.good[Math.floor(Math.random() * r.good.length)];
+  if (r.best) return r.best;
+  for (let i = 0; i < 400; i++) { const c = { x: 0.06 + Math.random() * 0.88, y: Math.random() }; if (!onRoad(c.x, c.y)) return c; }
+  return { x: 0.15, y: 0.5 };
+}
+
+// ----- Nhấn giữ một bông hoa để dời chỗ (chủ vườn) -----
+let suppressClickUntil = 0;
+let holdHinted = false;
+function startFlowerHold(e, id, el) {
+  if (!isOwner() || mode || (e.pointerType === "mouse" && e.button !== 0)) return;
+  const sx = e.clientX, sy = e.clientY;
+  let dragging = false, pos = null, timer = null;
+  const cleanup = () => {
+    clearTimeout(timer);
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    document.removeEventListener("pointercancel", up);
+  };
+  const move = (ev) => {
+    if (!dragging) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) cleanup(); return; }   // di chuyển trước khi đủ lâu: không phải nhấn giữ
+    const p = getPoem(id), vh = window.innerHeight;
+    if (!p) return;
+    pos = { x: clamp(ev.clientX / window.innerWidth, 0.04, 0.96), y: clamp((vh - ev.clientY - 10) / (vh * 0.42), 0, 1) };
+    placeFlower(el, { ...p, ...pos });
+    el.classList.toggle("blocked", onRoad(pos.x, pos.y));      // đỏ mờ = đường đi, không thả được
+  };
+  const up = () => {
+    cleanup();
+    if (!dragging) return;
+    el.classList.remove("moving", "blocked");
+    suppressClickUntil = Date.now() + 400;
+    if (pos && onRoad(pos.x, pos.y)) {
+      const p = getPoem(id);
+      if (p) placeFlower(el, p);                                    // thả trên đường: trả hoa về chỗ cũ
+      toast("Không dời hoa lên đường đi được 🚫");
+    } else if (pos) {
+      db.ref("garden/poems/" + id).update({ x: pos.x, y: pos.y, t: Date.now() });
+      touchPoem(id);
+      toast("Đã dời bông hoa 🌷");
+    }
+  };
+  timer = setTimeout(() => {
+    dragging = true;
+    closePanel();
+    el.classList.add("moving");
+    try { navigator.vibrate && navigator.vibrate(25); } catch {}
+    if (!holdHinted) { holdHinted = true; toast("Đang cầm bông hoa: kéo tới chỗ mới rồi thả tay"); }
+  }, 520);
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+  document.addEventListener("pointercancel", up);
+}
+
+// ----- Sửa bài thơ + ngày viết (chủ vườn) -----
+let editId = null;
+const fmtWritten = (w) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(w || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+function openEdit(id) {
+  const p = getPoem(id);
+  if (!isOwner() || !p) return;
+  editId = id;
+  $("edit-text").value = p.texts[0];
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(p.written || "");
+  $("d-dd").value = m ? m[3] : ""; $("d-mm").value = m ? m[2] : ""; $("d-yyyy").value = m ? m[1] : "";
+  $("edit-err").textContent = "";
+  $("edit-overlay").hidden = false;
+  setTimeout(() => $("edit-text").focus(), 50);
+}
+function closeEdit() { $("edit-overlay").hidden = true; editId = null; }
+["d-dd", "d-mm", "d-yyyy"].forEach((id, i, arr) => {
+  $(id).addEventListener("input", () => {
+    $(id).value = $(id).value.replace(/\D/g, "");
+    if ($(id).value.length >= $(id).maxLength && i < arr.length - 1) $(arr[i + 1]).focus();
+  });
+});
+$("d-today").addEventListener("click", () => {
+  const d = new Date();
+  $("d-dd").value = pad2(d.getDate()); $("d-mm").value = pad2(d.getMonth() + 1); $("d-yyyy").value = String(d.getFullYear());
+});
+$("d-clear").addEventListener("click", () => { $("d-dd").value = ""; $("d-mm").value = ""; $("d-yyyy").value = ""; });
+function readDateInputs() {
+  const d = $("d-dd").value.trim(), m = $("d-mm").value.trim(), y = $("d-yyyy").value.trim();
+  if (!d && !m && !y) return { ok: true, value: "" };
+  const dd = +d, mm = +m, yy = +y;
+  if (!dd || !mm || y.length !== 4) return { ok: false, err: "Điền đủ ngày / tháng / năm (năm 4 chữ số), hoặc để trống hết." };
+  const dt = new Date(yy, mm - 1, dd);
+  if (yy < 1000 || dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return { ok: false, err: "Ngày này không có thật, kiểm tra lại nhé." };
+  return { ok: true, value: `${y}-${pad2(mm)}-${pad2(dd)}` };
+}
+$("edit-box").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const p = getPoem(editId);
+  if (!p) { closeEdit(); return; }
+  const text = $("edit-text").value.trim();
+  if (!text) { $("edit-err").textContent = "Bài thơ không được để trống."; return; }
+  const dt = readDateInputs();
+  if (!dt.ok) { $("edit-err").textContent = dt.err; return; }
+  const upd = {
+    [`poems/${p.id}/texts`]: [text],
+    [`poems/${p.id}/written`]: dt.value || null,
+    [`poems/${p.id}/t`]: Date.now(),
+  };
+  if (text !== p.texts[0]) {      // sửa chữ thì chữ đã rơi không còn khớp nữa: cho hoa khỏe lại
+    upd[`poems/${p.id}/missing`] = null;
+    state.fallen.filter((f) => f.flowerId === p.id).forEach((f) => { upd[`fallen/${f.id}`] = null; });
+  }
+  db.ref("garden").update(upd);
+  const oldZone = p.zone, newZone = yearOf(dt.value) || newestZone();
+  closeEdit();
+  toast(newZone !== oldZone && p.status === "garden" ? `Đã lưu. Bông hoa chuyển sang khu ${newZone} 🌷` : "Đã lưu bài thơ ✏️");
+});
+$("edit-cancel").addEventListener("click", closeEdit);
+$("edit-close").addEventListener("click", closeEdit);
+$("edit-overlay").addEventListener("click", (e) => { if (e.target === $("edit-overlay")) closeEdit(); });
+$("edit-btn").addEventListener("click", () => { if (openId) openEdit(openId); });
+
+// ----- Khen hoa / chê hoa (khách) + nhật ký mini (chủ vườn) -----
+let reactBusyUntil = 0, reactQuery = null, reactCb = null;
+const praiseSeen = new Set();
+function stopReactions() {
+  if (reactQuery) { try { reactQuery.off("value", reactCb); } catch {} reactQuery = null; }
+}
+function renderReactions(obj) {
+  const rows = Object.keys(obj || {}).map((k) => obj[k]).sort((a, b) => (b.t || 0) - (a.t || 0));
+  const ul = $("react-list");
+  ul.innerHTML = "";
+  $("react-log").hidden = false;
+  $("react-empty").hidden = rows.length > 0;
+  rows.forEach((r) => {
+    const li = document.createElement("li");
+    li.textContent = `${r.kind === "praise" ? "🌸" : "🙅"} ${r.name || "?"} ${r.kind === "praise" ? "khen" : "chê"}${r.t ? " · " + fmtTime(r.t) : ""}`;
+    ul.appendChild(li);
+  });
+}
+function watchReactions(id) {
+  stopReactions();
+  $("react-log").hidden = true;
+  if (!isOwner()) return;
+  reactQuery = db.ref("reactions/" + id).limitToLast(40);
+  reactCb = reactQuery.on("value", (s) => renderReactions(s.val()));
+}
+// các nút/chữ phụ trong bảng thơ tùy vai trò
+function setupPanelExtras(p, fromBasket) {
+  $("react-bar").hidden = isOwner() || fromBasket;
+  $("react-msg").hidden = true;
+  $("edit-btn").style.display = isOwner() && !p.hybrid ? "" : "none";
+  watchReactions(p.id);
+}
+function react(kind) {
+  const p = getPoem(openId);
+  if (!p || isOwner() || Date.now() < reactBusyUntil) return;
+  reactBusyUntil = Date.now() + 6000;
+  db.ref("reactions/" + p.id).push().set({ name: ME.name, uid: ME.uid, kind, t: SV.TIMESTAMP }).catch(() => {});
+  if (kind === "praise") {
+    const m = $("react-msg");
+    m.textContent = "chà bông hoa thơm quá";
+    m.hidden = false;
+    setTimeout(() => { closePanel(); announcePraise(p.id); }, 1500);
+  } else {
+    $("note-overlay").hidden = false;
+  }
+}
+$("praise-btn").addEventListener("click", () => react("praise"));
+$("tease-btn").addEventListener("click", () => react("tease"));
+$("note-ok").addEventListener("click", () => { $("note-overlay").hidden = true; });
+$("note-overlay").addEventListener("click", (e) => { if (e.target === $("note-overlay")) $("note-overlay").hidden = true; });
+
+function announcePraise(poemId) {
+  const ref = db.ref("garden/praise").push();
+  praiseSeen.add(ref.key);
+  ref.set({ poem: poemId, at: Date.now(), by: ME.uid }).catch(() => {});
+  setTimeout(() => { try { ref.remove(); } catch {} }, 25000);
+  runPraiseFlock(poemId);
+}
+// đàn 5 con bướm bay vào, lượn quanh rồi đậu lên bông hoa được khen (hoa rung rinh tỏa sáng), sau đó bay đi
+async function runPraiseFlock(poemId) {
+  const pm = getPoem(poemId);
+  if (!pm || pm.zone !== curZone || !flowerEl(poemId)) return;
+  flowerEl(poemId).classList.add("praised");
+  await Promise.all([0, 1, 2, 3, 4].map((i) => flockMember(poemId, i)));
+  flowerEl(poemId)?.classList.remove("praised");
+}
+async function flockMember(poemId, i) {
+  await sleep(i * 300);
+  const el = document.createElement("div");
+  el.className = "bf";
+  el.innerHTML = BTF_SVG;
+  const [c1, c2] = BTF_COLORS[i % BTF_COLORS.length];
+  el.style.setProperty("--bw", c1);
+  el.style.setProperty("--bw2", c2);
+  $("bee-layer").appendChild(el);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const side = i % 2 ? 1 : -1, spin = i % 2 ? 1 : -1;
+  const f = makeFlyer(el, side > 0 ? vw + 50 : -50, vh * rand(0.2, 0.6));
+  const ang = (i / 5) * Math.PI * 2, off = { x: Math.cos(ang) * 22, y: Math.sin(ang) * 4 };
+  try {
+    let h = headPoint(poemId);
+    if (!h) return;
+    await f.orbit(h.x, h.y - 40, rand(70, 130), rand(40, 70), rand(0, Math.PI * 2), rand(3200, 4400), spin);
+    h = headPoint(poemId) || h;
+    await f.flyTo(h.x + off.x, h.y - 6 + off.y);
+    el.classList.add("landed");
+    await animate(2800, (u) => { const q = headPoint(poemId); if (q) f.place(q.x + off.x + Math.sin(u * 30), q.y - 6 + off.y); });
+    el.classList.remove("landed");
+    await f.flyTo(side > 0 ? vw + 60 : -60, f.y - 80);
+  } finally {
+    el.remove();
+  }
+}
 
 // ---------- Ai đang trong vườn + con trỏ ----------
 const peers = {};            // uid -> {name, role, x, y, t}
@@ -2282,7 +2842,7 @@ $("log-overlay").addEventListener("click", (e) => { if (e.target === $("log-over
 function exportGarden() {
   const data = {
     version: 2,
-    poems: state.poems.map(({ id, texts, types, hybrid, parents, x, y, status, missing, gift, from }) => ({ id, texts, types, hybrid, parents, x, y, status, missing, gift, from })),
+    poems: state.poems.map(({ id, texts, types, hybrid, parents, x, y, status, missing, gift, from, written }) => ({ id, texts, types, hybrid, parents, x, y, status, missing, gift, from, written })),
     fallen: state.fallen.map(({ id, word, flowerId, key, x, b }) => ({ id, word, flowerId, key, x, b })),
     compost: state.compost,
   };
@@ -2440,7 +3000,10 @@ function startGarden() {
 // ---------- Phím tắt ----------
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!$("draw-overlay").hidden) closeDraw();
+  if (!$("note-overlay").hidden) $("note-overlay").hidden = true;
+  else if (!$("edit-overlay").hidden) closeEdit();
+  else if (!$("search-overlay").hidden) closeSearch();
+  else if (!$("draw-overlay").hidden) closeDraw();
   else if (!panel.hidden && panelFromBasket) closePanel();
   else if (!$("gift-overlay").hidden) closeGift();
   else if (!$("seedgift-overlay").hidden) closeSeedGifts();

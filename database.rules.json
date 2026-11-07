@@ -33,6 +33,9 @@
       },
       "lastTouch": {
         ".write": "auth != null"
+      },
+      "praise": {
+        ".write": "auth != null"
       }
     },
     "presence": {
@@ -69,6 +72,30 @@
         },
         "$other": {
           ".validate": false
+        }
+      }
+    },
+    "reactions": {
+      ".read": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'",
+      "$poem": {
+        "$id": {
+          ".write": "auth != null && (auth.token.email == 'chu-vuon@khuvuontho.app' || (!data.exists() && newData.child('uid').val() == auth.uid))",
+          ".validate": "newData.hasChildren(['name','uid','kind','t']) && (newData.child('kind').val() == 'praise' || newData.child('kind').val() == 'tease') && newData.child('name').isString() && newData.child('name').val().length <= 40",
+          "name": {
+            ".validate": true
+          },
+          "uid": {
+            ".validate": true
+          },
+          "kind": {
+            ".validate": true
+          },
+          "t": {
+            ".validate": true
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     }
