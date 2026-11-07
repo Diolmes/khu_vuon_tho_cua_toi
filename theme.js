@@ -310,7 +310,7 @@
     btn.id = "theme-btn";
     btn.type = "button";
     btn.title = "Đổi phong cách và bộ chữ";
-    btn.textContent = "🎨 Giao diện";
+    btn.innerHTML = '✨<span class="lbl"> Giao diện</span>';
     (toolbar || document.body).appendChild(btn);
 
     const ov = document.createElement("div");

@@ -1335,3 +1335,26 @@ body.dragging-flower, body.dragging-flower * { user-select: none; -webkit-user-s
 #photo-tune label { display: flex; flex-direction: column; gap: 2px; font-size: .78rem; opacity: .85; }
 #photo-tune input[type=range] { width: 100%; }
 .photo-hint { font-size: .72rem; opacity: .6; font-style: italic; }
+
+/* ---------- Điện thoại dọc: gọn và thoáng hơn ---------- */
+@media (max-width: 600px) and (min-height: 521px) {
+  header { padding-top: calc(10px + env(safe-area-inset-top)); }
+  header h1 { font-size: 1.05rem; }
+  .sub { font-size: .7rem; margin-top: 3px; }
+  #toolbar { top: calc(62px + env(safe-area-inset-top)); gap: 5px; padding: 0 8px; }
+  #toolbar button { padding: 2px 9px; font-size: .74rem; min-height: 30px; line-height: 1.2; border-width: 1.5px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  #toolbar button .ic, #toolbar button .ic svg { font-size: 1em; }
+  #basket-count, #gifts-count, #lab-btn-count { min-width: 1.2em; font-size: .7rem; }
+  #who { top: calc(134px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); max-width: 86vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .66rem; padding: 2px 10px; opacity: .8; }
+  #mode-banner { top: calc(160px + env(safe-area-inset-top)); font-size: .78rem; }
+  #zone-nav { left: 4px; padding: 2px; opacity: .88; }
+  #zone-nav button { font-size: .7rem; padding: 3px 6px; }
+  #zone-label { font-size: .7rem; padding: 6px 2px; }
+  #seed-toggle { font-size: .8rem; padding: 4px 12px; min-height: 34px; }
+  #bin { width: 64px; }
+  .bin-svg { width: 44px; height: 40px; }
+}
+@media (max-width: 600px) and (min-height: 521px) {
+  #theme-btn .lbl { display: none; }
+  #who { top: calc(132px + env(safe-area-inset-top)); }
+}
