@@ -19,9 +19,10 @@ let ROLE = null;      // "owner" | "guest"
 let ME = null;        // { uid, name }
 let db = null, auth = null, SV = null, OWNER_MAIL = "", BACKEND_MODE = "mock";
 // Vườn vô tận chia theo năm: mỗi khu là một năm. Bài chưa có ngày viết nằm ở khu mới nhất; điền ngày rồi thì về khu của năm đó.
+const MIN_ZONE = 2021;                           // khu cũ nhất: trước năm 2021 vườn chưa có thơ
 let curZone = new Date().getFullYear();          // khu đang đứng (= năm)
 let followNewest = true;                         // true: luôn đứng ở khu mới nhất
-(() => { try { const z = parseInt(sessionStorage.getItem("khuVuonKhu"), 10); if (z) { curZone = z; followNewest = false; } } catch {} })();
+(() => { try { const z = parseInt(sessionStorage.getItem("khuVuonKhu"), 10); if (z >= MIN_ZONE) { curZone = z; followNewest = false; } } catch {} })();
 let realDb = null;    // máy chủ thật; `db` bị tráo sang bộ nhớ tạm khi khách "hóa thân chủ vườn" (DEMO)
 let DEMO = false;
 const isOwner = () => ROLE === "owner";
@@ -2029,7 +2030,8 @@ function newestZone() {
 function recomputeZones() {
   const newest = newestZone(), changed = [];
   state.poems.forEach((p) => {
-    const z = yearOf(p.written) || newest;
+    const y = yearOf(p.written);
+    const z = y ? Math.max(MIN_ZONE, y) : newest;          // ngày viết trước 2021 (nếu lỡ có) cũng xếp vào khu 2021
     if (p.zone !== z) { p.zone = z; changed.push(p.id); }
   });
   if (followNewest && curZone !== newest) { curZone = newest; changed.push("*"); updateZoneUI(); }
@@ -2052,6 +2054,7 @@ function updateZoneUI() {
   const newest = newestZone();
   $("zone-label").textContent = "Khu " + curZone + (curZone === newest ? " · mới nhất" : "");
   $("zone-newer").disabled = curZone >= newest;
+  $("zone-older").disabled = curZone <= MIN_ZONE;
 }
 function showZoneFlash() {
   const f = $("zone-flash");
@@ -2060,7 +2063,7 @@ function showZoneFlash() {
 }
 function switchZone(n, flash = true) {
   const newest = newestZone();
-  n = clamp(Math.round(n), 1, newest);
+  n = clamp(Math.round(n), MIN_ZONE, newest);
   if (n === curZone) return;
   closePanel(); setMode(null);
   curZone = n;
@@ -2078,7 +2081,7 @@ $("zone-newer").addEventListener("click", () => switchZone(curZone + 1));
 $("zone-label").addEventListener("click", () => {
   const v = parseInt(prompt("Đến khu (nhập năm, ví dụ 2023):", String(curZone)), 10);
   if (!v) return;
-  if (v < 1 || v > newestZone()) { toast(`Khu mới nhất là ${newestZone()}.`); return; }
+  if (v < MIN_ZONE || v > newestZone()) { toast(`Vườn có các khu từ ${MIN_ZONE} đến ${newestZone()}.`); return; }
   switchZone(v);
 });
 updateZoneUI();
@@ -2398,7 +2401,8 @@ function readDateInputs() {
   const dd = +d, mm = +m, yy = +y;
   if (!dd || !mm || y.length !== 4) return { ok: false, err: "Điền đủ ngày / tháng / năm (năm 4 chữ số), hoặc để trống hết." };
   const dt = new Date(yy, mm - 1, dd);
-  if (yy < 1000 || dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return { ok: false, err: "Ngày này không có thật, kiểm tra lại nhé." };
+  if (yy < MIN_ZONE) return { ok: false, err: `Trước năm ${MIN_ZONE} vườn chưa có thơ, hãy chọn ngày từ năm ${MIN_ZONE} trở đi.` };
+  if (dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return { ok: false, err: "Ngày này không có thật, kiểm tra lại nhé." };
   return { ok: true, value: `${y}-${pad2(mm)}-${pad2(dd)}` };
 }
 $("edit-box").addEventListener("submit", (e) => {
