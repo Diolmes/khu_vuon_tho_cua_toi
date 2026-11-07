@@ -22,7 +22,7 @@ Chạm vào một chữ trong bài thơ, những bông hoa có chữ ấy sẽ r
 Bấm **🔍 Tìm hoa**, gõ một từ khóa (không cần gõ dấu). Bấm vào kết quả để tới đúng bông hoa.
 
 ### Đi dạo qua các khu vườn
-Khu vườn này có nhiều khu: mỗi khu là một năm, từ năm 2021 đến nay. Nhãn ở dưới cùng cho biết bạn đang ở khu nào.
+Khu vườn này có nhiều khu: mỗi khu là một năm, từ năm 2022 đến nay. Nhãn ở dưới cùng cho biết bạn đang ở khu nào.
 - Máy tính: cuộn chuột xuống để đi về những khu cũ hơn, cuộn lên để quay lại.
 - Điện thoại: vuốt dọc trên phần đất.
 - Hoặc bấm nút ▲ ▼ ở hai bên nhãn khu dành cho người thích bấm.

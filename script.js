@@ -19,7 +19,7 @@ let ROLE = null;      // "owner" | "guest"
 let ME = null;        // { uid, name }
 let db = null, auth = null, SV = null, OWNER_MAIL = "", BACKEND_MODE = "mock";
 // Vườn vô tận chia theo năm: mỗi khu là một năm. Bài chưa có ngày viết nằm ở khu mới nhất; điền ngày rồi thì về khu của năm đó.
-const MIN_ZONE = 2021;                           // khu cũ nhất: trước năm 2021 vườn chưa có thơ
+const MIN_ZONE = 2022;                           // khu cũ nhất: trước năm 2022 vườn chưa có thơ
 let curZone = new Date().getFullYear();          // khu đang đứng (= năm)
 let followNewest = true;                         // true: luôn đứng ở khu mới nhất
 (() => { try { const z = parseInt(sessionStorage.getItem("khuVuonKhu"), 10); if (z >= MIN_ZONE) { curZone = z; followNewest = false; } } catch {} })();
@@ -2038,7 +2038,7 @@ function recomputeZones() {
   const newest = newestZone(), changed = [];
   state.poems.forEach((p) => {
     const y = yearOf(p.written);
-    const z = y ? Math.max(MIN_ZONE, y) : newest;          // ngày viết trước 2021 (nếu lỡ có) cũng xếp vào khu 2021
+    const z = y ? Math.max(MIN_ZONE, y) : newest;          // ngày viết trước 2022 (nếu lỡ có) cũng xếp vào khu cũ nhất
     if (p.zone !== z) { p.zone = z; changed.push(p.id); }
   });
   if (followNewest && curZone !== newest) { curZone = newest; changed.push("*"); updateZoneUI(); }
@@ -2059,7 +2059,7 @@ function refreshZoneView(animate = false) {
 }
 function updateZoneUI() {
   const newest = newestZone();
-  $("zone-label").textContent = "Khu " + curZone + (curZone === newest ? " · mới nhất" : "");
+  $("zone-label").textContent = "Khu " + curZone + "";
   $("zone-newer").disabled = curZone >= newest;
   $("zone-older").disabled = curZone <= MIN_ZONE;
 }

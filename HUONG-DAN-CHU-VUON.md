@@ -49,23 +49,23 @@ Hoa đã hái nằm trong giỏ. Bấm vào bông trong giỏ để đọc thơ.
 - **🗑️ Thùng rác hữu cơ**: xóa hẳn, không lấy lại được.
 - **🎁 Tặng**: viết tên người nhận (hoặc bỏ qua), web vẽ tấm thẻ hoa thành ảnh và chép vào clipboard để bạn dán gửi. Nếu trình duyệt không cho chép thì tải ảnh về máy. Gửi xong, hoa bị bỏ khỏi giỏ. Hoa do khách tặng (đen trắng) thì không tặng lại được.
 
-## 4. Vườn chia theo năm: mỗi khu là một năm (từ 2021)
+## 4. Vườn chia theo năm: mỗi khu là một năm (từ 2022)
 
-- Vườn có vô số khu. **Mỗi khu là một năm.** Nhãn dưới cùng (ví dụ "Khu 2026 · mới nhất") cho biết bạn đang ở khu nào.
+- Vườn có vô số khu. **Mỗi khu là một năm.** Nhãn dưới cùng (ví dụ "Khu 2026") cho biết bạn đang ở khu nào.
 - Bài **chưa có ngày viết** nằm ở khu **mới nhất**. Khu mới nhất là năm hiện tại, hoặc năm lớn nhất của một bài đã điền ngày nếu năm đó lớn hơn.
 - Bài **đã có ngày viết** nằm ở khu của năm đó.
 - Đi giữa các khu:
   - Máy tính: cuộn chuột. Cuộn xuống để lùi về khu cũ hơn ("phía sau" vườn), cuộn lên để quay lại khu mới hơn.
   - Điện thoại: vuốt dọc trên phần đất trống.
   - Hoặc bấm nút **▲ ▼** hai bên nhãn khu. Bấm vào chính nhãn để nhập thẳng một năm.
-- Khu cũ nhất là **2021** (trước 2021 vườn chưa có thơ), khu mới nhất là năm hiện tại hoặc năm lớn nhất của một bài đã điền ngày. Không đi ra ngoài khoảng đó được.
+- Khu cũ nhất là **2022** (trước 2022 vườn chưa có thơ), khu mới nhất là năm hiện tại hoặc năm lớn nhất của một bài đã điền ngày. Không đi ra ngoài khoảng đó được.
 - Ong, bướm, mưa và cục phân bón đều làm việc trong khu bạn đang đứng. Ong chỉ ghép cặp hoa trong cùng một khu.
 
 ## 5. Sửa bài thơ và đặt ngày viết
 
 Mở bài thơ, bấm **✏️ sửa bài thơ**:
 - Sửa chữ trong ô bài thơ. Khi sửa chữ, các chữ đã rơi của bông này được làm mới (hoa khỏe lại).
-- **Ngày viết**: chọn **Hôm nay**, hoặc gõ ba ô **DD / MM / YYYY**, hoặc **Bỏ ngày** để xóa. **Năm là bắt buộc** (4 chữ số, từ 2021 trở đi); tháng và ngày có thể bỏ trống (có ngày thì cần có tháng). Ví dụ chỉ điền `2023` thì bài hiện "viết năm 2023", điền thêm tháng thì hiện "viết tháng 03/2023", điền đủ thì hiện "viết ngày 15/03/2023".
+- **Ngày viết**: chọn **Hôm nay**, hoặc gõ ba ô **DD / MM / YYYY**, hoặc **Bỏ ngày** để xóa. **Năm là bắt buộc** (4 chữ số, từ 2022 trở đi); tháng và ngày có thể bỏ trống (có ngày thì cần có tháng). Ví dụ chỉ điền `2023` thì bài hiện "viết năm 2023", điền thêm tháng thì hiện "viết tháng 03/2023", điền đủ thì hiện "viết ngày 15/03/2023".
 - Có ngày thì hoa chuyển về khu của năm đó. Xóa ngày thì hoa trở về khu mới nhất. Web báo hoa chuyển sang khu nào.
 - Bài lai (do ong sinh ra) không sửa được. Hoa lai tự mang ngày viết của bông mẹ.
 
