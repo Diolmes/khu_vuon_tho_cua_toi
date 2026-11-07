@@ -98,6 +98,10 @@
           }
         }
       }
+    },
+    "lab": {
+      ".read": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'",
+      ".write": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'"
     }
   }
 }

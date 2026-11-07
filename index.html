@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Khu vườn thơ của tôi</title>
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
   <div id="sky" aria-hidden="true"></div>
@@ -30,6 +30,7 @@
     <button id="basket-btn" type="button">🧺 Giỏ <span id="basket-count">0</span></button>
     <button id="avatar-btn" type="button" title="Vẽ nhân vật của bạn để đi dạo trong vườn">🎨 Nhân vật</button>
     <button id="gifts-btn" type="button" title="Hạt giống khách tặng bạn">🎁 Hạt được tặng <span id="gifts-count">0</span></button>
+    <button id="lab-btn" type="button" title="Lán nghiên cứu: giấy nháp, hạt giống đang nghiên cứu">🏚️ Lán <span id="lab-btn-count">0</span></button>
     <button id="demo-btn" type="button" title="Thử làm chủ vườn. Mọi thay đổi chỉ để thử và biến mất khi thoát">🎭 Hóa thân chủ vườn</button>
     <button id="rain-btn" type="button" title="Gọi mưa">☔</button>
     <button id="bee-btn" type="button" title="Gọi ong đi thụ phấn">🐝</button>
@@ -158,6 +159,69 @@
   <div id="demo-banner" hidden>
     <span>🎭 Đang trải nghiệm làm chủ vườn. Mọi thay đổi chỉ để thử và sẽ biến mất khi bạn thoát chế độ này hoặc thoát khỏi trang.</span>
     <button id="demo-exit" type="button">Thoát chế độ trải nghiệm</button>
+  </div>
+
+  <!-- Lán nghiên cứu (chủ vườn): bảng ghim giấy nháp, bàn nghiên cứu, thùng rác -->
+  <div id="lab-overlay" hidden>
+    <div id="lab-scene">
+      <button id="lab-close" type="button" aria-label="Đóng">×</button>
+      <div class="lab-sign">🏚️ Lán nghiên cứu</div>
+      <div class="lab-top">
+        <div id="lab-board">
+          <div id="lab-grid"></div>
+          <div class="lab-count"><span id="lab-count">0</span> / 9 tờ</div>
+        </div>
+        <div id="lab-trash">
+          <div id="trash-can" title="Thùng rác giấy nháp">
+            <svg viewBox="0 0 60 70" aria-hidden="true">
+              <path d="M10 18 L50 18 L45 64 Q30 68 15 64 Z" fill="#8f6b43" stroke="#6b4a2a" stroke-width="2.5" stroke-linejoin="round"/>
+              <path d="M18 24 V58 M30 24 V60 M42 24 V58" stroke="#6b4a2a" stroke-width="2" stroke-linecap="round"/>
+              <ellipse cx="30" cy="18" rx="22" ry="5" fill="#a98355" stroke="#6b4a2a" stroke-width="2.5"/>
+              <path class="trash-paper" d="M20 17 L26 5 L33 13 L38 4 L42 16 Z" fill="#fffdf2" stroke="#d9c9a8" stroke-width="1.2" stroke-linejoin="round"/>
+            </svg>
+            <span id="trash-badge" hidden>0</span>
+          </div>
+          <button id="trash-open" type="button">Xem giấy bỏ</button>
+          <button id="trash-compost" type="button" title="Xóa hẳn tất cả giấy trong thùng">🌱 Đổ vào thùng phân hữu cơ</button>
+        </div>
+      </div>
+      <div id="lab-desk">
+        <div class="desk-tools" aria-hidden="true"><span>🔬</span><span>🧪</span><span>🔍</span><span>🖋️</span><span>🪴</span></div>
+        <div id="blank-paper">
+          <textarea id="blank-text" rows="5" disabled placeholder="Mẩu giấy trắng. Bấm “Nghiên cứu hạt mới” để bắt đầu viết nháp..."></textarea>
+          <div class="blank-actions">
+            <button type="button" id="blank-new">🔬 Nghiên cứu hạt mới</button>
+            <button type="button" id="blank-pin" hidden>📌 Treo lên bảng</button>
+            <button type="button" id="blank-drop" hidden>🗑️ Bỏ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Xem / sửa / bỏ một tờ giấy trên bảng -->
+  <div id="paper-overlay" hidden>
+    <div id="paper-box">
+      <button id="paper-close" type="button" aria-label="Đóng">×</button>
+      <div id="paper-text"></div>
+      <textarea id="paper-edit-text" rows="10" hidden></textarea>
+      <div class="paper-actions">
+        <button type="button" id="paper-edit">✏️ Sửa</button>
+        <button type="button" id="paper-drop">🗑️ Bỏ</button>
+        <button type="button" id="paper-cancel" hidden>Hủy</button>
+        <button type="button" id="paper-save" hidden>Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Giấy trong thùng rác -->
+  <div id="trash-overlay" hidden>
+    <div id="trash-box">
+      <button id="trash-close" type="button" aria-label="Đóng">×</button>
+      <h2>🗑️ Giấy đã bỏ</h2>
+      <p id="trash-empty">Thùng rác trống.</p>
+      <div id="trash-list"></div>
+    </div>
   </div>
 
   <!-- Khu vườn theo năm: nhãn khu + nút đi giữa các khu -->
@@ -291,8 +355,8 @@
 
   <div id="toast" role="status"></div>
 
-  <script src="firebase-config.js?v=18"></script>
-  <script src="backend.js?v=18"></script>
-  <script src="script.js?v=18"></script>
+  <script src="firebase-config.js?v=20"></script>
+  <script src="backend.js?v=20"></script>
+  <script src="script.js?v=20"></script>
 </body>
 </html>

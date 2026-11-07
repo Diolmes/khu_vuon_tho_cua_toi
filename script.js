@@ -1901,6 +1901,7 @@ function attachSync() {
   });
   // hộp hạt giống tặng: chỉ chủ vườn đọc được (luật máy chủ cũng chặn khách)
   if (isOwner()) listen(db.ref("gifts"), "value", (s) => { state.gifts = s.val() || {}; updateGiftsCount(); });
+  if (isOwner()) listen(db.ref("lab/papers"), "value", (s) => { state.lab = s.val() || {}; updateLabCount(); });       // giấy nháp trong lán
   refreshHint();
   updateNet();
   applyGlow();
@@ -1973,7 +1974,7 @@ function resetGardenView() {
   closePanel(); closeBasket(); closeSeedGifts(); setMode(null);
   gardenEl.querySelectorAll(".flower, .fallen, .seed").forEach((el) => el.remove());
   holdRender.clear();
-  Object.assign(state, { poems: [], fallen: [], compost: 0, bag: [], order: null, last: null, plan: null, touch: null, gifts: {} });
+  Object.assign(state, { poems: [], fallen: [], compost: 0, bag: [], order: null, last: null, plan: null, touch: null, gifts: {}, lab: {} });
 }
 
 async function enterDemo() {
@@ -2083,7 +2084,7 @@ $("zone-label").addEventListener("click", () => {
 updateZoneUI();
 
 const anyOverlayOpen = () => !$("gate").hidden ||
-  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay"].some((id) => !$(id).hidden);
+  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay", "lab-overlay", "paper-overlay", "trash-overlay"].some((id) => !$(id).hidden);
 
 // Cuộn chuột / trượt ngón tay để đi giữa các khu: cuộn xuống = lùi về khu cũ hơn ("phía sau" khu vườn)
 let wheelAcc = 0, wheelLocked = false, wheelTimer = null;
@@ -2520,6 +2521,189 @@ async function flockMember(poemId, i) {
     el.remove();
   }
 }
+
+// ================= Lán nghiên cứu: giấy nháp của chủ vườn =================
+// Dữ liệu: lab/papers/{id} = { text, status: "board" | "trash", slot, t }. Chỉ chủ vườn đọc/ghi được.
+const LAB_MAX = 9;                       // bảng ghim tối đa 9 tờ
+state.lab = {};
+const hashOf = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+const labRows = () => Object.keys(state.lab || {}).map((id) => ({ id, ...state.lab[id] }));
+const boardPapers = () => labRows().filter((r) => r.status === "board").sort((a, b) => (a.t || 0) - (b.t || 0));
+const trashPapers = () => labRows().filter((r) => r.status === "trash").sort((a, b) => (b.t || 0) - (a.t || 0));
+// mỗi tờ giữ một ô trên bảng; ô trùng (hiếm) thì chuyển sang ô trống đầu tiên
+function labLayout() {
+  const cells = new Array(LAB_MAX).fill(null), rest = [];
+  boardPapers().forEach((r) => {
+    if (Number.isInteger(r.slot) && r.slot >= 0 && r.slot < LAB_MAX && !cells[r.slot]) cells[r.slot] = r; else rest.push(r);
+  });
+  rest.forEach((r) => { const i = cells.indexOf(null); if (i >= 0) cells[i] = r; });
+  return cells;
+}
+const labFirstFree = () => labLayout().indexOf(null);
+const PAPER_COLORS = ["#fffdf2", "#fff3d6", "#f1f7e4", "#fdeef0"];
+
+function updateLabCount() {
+  $("lab-btn-count").textContent = boardPapers().length;
+  if (!$("lab-overlay").hidden) renderLab();
+  if (!$("trash-overlay").hidden) renderTrashList();
+}
+function renderLab() {
+  const cells = labLayout();
+  const grid = $("lab-grid");
+  grid.innerHTML = "";
+  cells.forEach((r) => {
+    const slot = document.createElement("div");
+    slot.className = "pin-slot";
+    if (r) {
+      const h = hashOf(r.id);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "paper";
+      b.style.setProperty("--tilt", ((h % 9) - 4) * 0.9 + "deg");
+      b.style.background = PAPER_COLORS[h % PAPER_COLORS.length];
+      b.title = "Bấm để xem";
+      const t = document.createElement("span");
+      t.textContent = r.text;
+      b.appendChild(t);
+      b.addEventListener("click", () => openPaper(r.id));
+      slot.appendChild(b);
+    }
+    grid.appendChild(slot);
+  });
+  $("lab-count").textContent = boardPapers().length;
+  const n = trashPapers().length;
+  $("trash-badge").textContent = n;
+  $("trash-badge").hidden = n === 0;
+  $("trash-open").disabled = n === 0;
+  $("trash-compost").disabled = n === 0;
+  $("trash-can").classList.toggle("full", n > 0);
+}
+function openLab() {
+  if (!isOwner() || anyOverlayOpen()) return;
+  closePanel();
+  renderLab();
+  $("lab-overlay").hidden = false;
+}
+function closeLab() { $("lab-overlay").hidden = true; }
+$("lab-btn").addEventListener("click", openLab);
+$("lab-close").addEventListener("click", closeLab);
+$("lab-overlay").addEventListener("click", (e) => { if (e.target === $("lab-overlay")) closeLab(); });
+
+// ----- Mẩu giấy trắng trên bàn: nghiên cứu hạt mới / treo lên bảng / bỏ -----
+function resetBlank() {
+  const t = $("blank-text");
+  t.value = "";
+  t.disabled = true;
+  $("blank-new").hidden = false;
+  $("blank-pin").hidden = true;
+  $("blank-drop").hidden = true;
+}
+$("blank-new").addEventListener("click", () => {
+  const t = $("blank-text");
+  t.disabled = false;
+  $("blank-new").hidden = true;
+  $("blank-pin").hidden = false;
+  $("blank-drop").hidden = false;
+  t.focus();
+});
+$("blank-pin").addEventListener("click", () => {
+  const text = $("blank-text").value.trim();
+  if (!text) { toast("Mẩu giấy còn trắng, hãy viết gì đó đã."); return; }
+  const slot = labFirstFree();
+  if (slot < 0) { toast("Bảng đã đủ 9 tờ, hãy bỏ bớt một tờ rồi treo tiếp nhé."); return; }
+  db.ref("lab/papers").push().set({ text, status: "board", slot, t: SV.TIMESTAMP }).catch(() => toast("Chưa treo được, bạn thử lại nhé."));
+  resetBlank();
+  toast("Đã ghim lên bảng 📌");
+});
+$("blank-drop").addEventListener("click", () => {
+  const text = $("blank-text").value.trim();
+  if (text) db.ref("lab/papers").push().set({ text, status: "trash", t: SV.TIMESTAMP });
+  resetBlank();
+  toast(text ? "Đã bỏ mẩu giấy vào thùng rác 🗑️" : "Đã bỏ mẩu giấy trắng.");
+});
+resetBlank();
+
+// ----- Xem / sửa / bỏ một tờ trên bảng -----
+let paperId = null;
+function showPaperMode(editing) {
+  $("paper-text").hidden = editing;
+  $("paper-edit-text").hidden = !editing;
+  $("paper-edit").hidden = editing;
+  $("paper-drop").hidden = editing;
+  $("paper-save").hidden = !editing;
+  $("paper-cancel").hidden = !editing;
+}
+function openPaper(id) {
+  const r = state.lab[id];
+  if (!r) return;
+  paperId = id;
+  $("paper-text").textContent = r.text;
+  showPaperMode(false);
+  $("paper-overlay").hidden = false;
+}
+function closePaper() { $("paper-overlay").hidden = true; paperId = null; }
+$("paper-edit").addEventListener("click", () => {
+  const r = state.lab[paperId];
+  if (!r) return;
+  $("paper-edit-text").value = r.text;
+  showPaperMode(true);
+  $("paper-edit-text").focus();
+});
+$("paper-cancel").addEventListener("click", () => showPaperMode(false));
+$("paper-save").addEventListener("click", () => {
+  const text = $("paper-edit-text").value.trim();
+  if (!text) { toast("Tờ giấy không được để trống. Muốn bỏ thì bấm Bỏ."); return; }
+  db.ref("lab/papers/" + paperId).update({ text, t: SV.TIMESTAMP });
+  $("paper-text").textContent = text;
+  showPaperMode(false);
+  toast("Đã sửa tờ giấy ✏️");
+});
+$("paper-drop").addEventListener("click", () => {
+  db.ref("lab/papers/" + paperId).update({ status: "trash", slot: null, t: SV.TIMESTAMP });
+  closePaper();
+  toast("Đã bỏ tờ giấy vào thùng rác 🗑️");
+});
+$("paper-close").addEventListener("click", closePaper);
+$("paper-overlay").addEventListener("click", (e) => { if (e.target === $("paper-overlay")) closePaper(); });
+
+// ----- Thùng rác: xem giấy bỏ, lấy lại, đổ vào thùng phân hữu cơ (xóa hẳn) -----
+function renderTrashList() {
+  const list = $("trash-list");
+  list.innerHTML = "";
+  const rows = trashPapers();
+  $("trash-empty").hidden = rows.length > 0;
+  rows.forEach((r) => {
+    const item = document.createElement("div");
+    item.className = "trash-item";
+    const t = document.createElement("div");
+    t.className = "trash-text";
+    t.textContent = r.text;
+    const back = document.createElement("button");
+    back.type = "button";
+    back.textContent = "↩️ Lấy lại";
+    back.addEventListener("click", () => {
+      const slot = labFirstFree();
+      if (slot < 0) { toast("Bảng đã đủ 9 tờ, hãy bỏ bớt một tờ trước đã."); return; }
+      db.ref("lab/papers/" + r.id).update({ status: "board", slot, t: SV.TIMESTAMP });
+      toast("Đã ghim lại lên bảng 📌");
+    });
+    item.append(t, back);
+    list.appendChild(item);
+  });
+}
+$("trash-open").addEventListener("click", () => { renderTrashList(); $("trash-overlay").hidden = false; });
+$("trash-close").addEventListener("click", () => { $("trash-overlay").hidden = true; });
+$("trash-overlay").addEventListener("click", (e) => { if (e.target === $("trash-overlay")) $("trash-overlay").hidden = true; });
+$("trash-compost").addEventListener("click", () => {
+  const rows = trashPapers();
+  if (!rows.length) return;
+  if (!confirm(`Đổ ${rows.length} tờ giấy vào thùng phân hữu cơ?\nGiấy sẽ bị xóa hẳn và không lấy lại được.`)) return;
+  const upd = {};
+  rows.forEach((r) => { upd[`papers/${r.id}`] = null; });
+  db.ref("lab").update(upd);
+  $("trash-overlay").hidden = true;
+  toast("Đã đổ giấy vào thùng phân hữu cơ 🌱");
+});
 
 // ---------- Ai đang trong vườn + con trỏ ----------
 const peers = {};            // uid -> {name, role, x, y, t}
@@ -3000,7 +3184,10 @@ function startGarden() {
 // ---------- Phím tắt ----------
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!$("note-overlay").hidden) $("note-overlay").hidden = true;
+  if (!$("paper-overlay").hidden) closePaper();
+  else if (!$("trash-overlay").hidden) $("trash-overlay").hidden = true;
+  else if (!$("lab-overlay").hidden) closeLab();
+  else if (!$("note-overlay").hidden) $("note-overlay").hidden = true;
   else if (!$("edit-overlay").hidden) closeEdit();
   else if (!$("search-overlay").hidden) closeSearch();
   else if (!$("draw-overlay").hidden) closeDraw();
