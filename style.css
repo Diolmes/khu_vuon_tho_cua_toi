@@ -11,10 +11,11 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+html { font-size: var(--root-size, 100%); }
 html, body { height: 100%; margin: 0; }
 
 body {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-body, Georgia, "Times New Roman", serif);
   color: var(--ink);
   background: linear-gradient(var(--sky-top), var(--sky-bottom));
   overflow: hidden;

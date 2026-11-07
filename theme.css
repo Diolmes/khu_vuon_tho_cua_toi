@@ -1,0 +1,114 @@
+/* ================= Giao diện theo theme (đi cùng theme.js) ================= */
+
+/* ----- Chữ: tiêu đề dùng bộ chữ tiêu đề, còn lại dùng bộ chữ thường ----- */
+h1, h2, h3, h4, .sub, #zone-label, #zone-flash, .lab-sign, .note-main, #praise-pop span, .gate-card h1 {
+  font-family: var(--font-head, Georgia, serif);
+}
+h1, h2, .lab-sign { font-weight: 500; letter-spacing: .3px; }
+.poem-font, #poem-text, .card-text, #blank-text, #paper-text, .trash-text, .sg-text { font-family: var(--font-body, Georgia, serif); }
+
+/* ----- Nút "Giao diện" + bảng chọn ----- */
+#theme-overlay {
+  position: fixed; inset: 0; z-index: 60; background: rgba(70, 50, 40, .4);
+  display: flex; align-items: center; justify-content: center; padding: 12px;
+}
+#theme-overlay[hidden] { display: none; }
+#theme-box {
+  position: relative; width: min(620px, 100%); max-height: 90vh; overflow: auto;
+  background: var(--card); border-radius: 22px; padding: 22px 24px 18px; box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+}
+#theme-box h2 { margin: 0 0 6px; font-weight: normal; font-size: 1.4rem; }
+#theme-box h3 { margin: 16px 0 6px; font-weight: normal; font-size: 1rem; opacity: .65; }
+#theme-close { position: absolute; top: 6px; right: 12px; border: none; background: none; font-size: 1.7rem; color: var(--ink); opacity: .5; cursor: pointer; }
+#theme-close:hover { opacity: 1; }
+#theme-styles { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+#theme-fonts { display: flex; flex-direction: column; gap: 8px; }
+.theme-opt {
+  font: inherit; text-align: left; display: flex; flex-direction: column; gap: 3px; color: var(--ink);
+  background: #fff; border: 2px solid #eadfcc; border-radius: 14px; padding: 10px 14px; cursor: pointer;
+}
+.theme-opt:hover { background: #fff6e6; }
+.theme-opt.on { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 163, 181, .3); }
+.theme-opt b { font-weight: 500; }
+.theme-opt span { font-size: .85rem; opacity: .7; }
+.theme-opt .sample { font-size: 1.05rem; opacity: .9; }
+.theme-opt i { display: flex; gap: 4px; margin-top: 4px; }
+.theme-opt u { width: 22px; height: 12px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, .12); }
+#theme-apply {
+  align-self: flex-end; margin-top: 8px; font: inherit; background: #d9588a; color: #fff;
+  border: 2px solid #d9588a; border-radius: 999px; padding: 6px 26px; cursor: pointer; font-weight: bold;
+}
+.theme-hint { margin: 12px 0 0; font-size: .8rem; opacity: .6; font-style: italic; }
+.theme-hint code { background: #f5ecda; border-radius: 4px; padding: 0 4px; }
+
+/* ----- Icon vẽ tay (chỉ có khi theme màu nước) thay cho emoji ----- */
+.ic { display: inline-block; width: 1.3em; height: 1.3em; vertical-align: -.28em; line-height: 0; }
+.ic svg { width: 100%; height: 100%; display: block; overflow: visible; }
+html[data-wc="1"] .ic svg { filter: url(#wc-icon); }
+#praise-pop .ic, .sep .ic { width: 1em; height: 1em; }
+
+/* ======================= THEME MÀU NƯỚC ======================= */
+html[data-wc="1"] body {
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='3'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .42  0 0 0 0 .36  0 0 0 .1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    radial-gradient(60% 38% at 14% 8%, rgba(176, 208, 238, .8), transparent 72%),
+    radial-gradient(48% 34% at 86% 16%, rgba(246, 196, 214, .6), transparent 72%),
+    radial-gradient(40% 26% at 52% 30%, rgba(252, 230, 190, .55), transparent 72%),
+    linear-gradient(var(--sky-top), var(--sky-bottom));
+}
+/* mây: nhòe như vệt nước trắng loang */
+html[data-wc="1"] .cloud { background: rgba(255, 255, 255, .78); filter: blur(7px); opacity: .8; }
+html[data-wc="1"] .cloud::before, html[data-wc="1"] .cloud::after { background: rgba(255, 255, 255, .78); }
+/* đất: nhiều mảng xanh loang chồng nhau, mép đồi nhòe */
+html[data-wc="1"] #ground {
+  background:
+    radial-gradient(ellipse 42% 52% at 16% 34%, rgba(150, 202, 150, .6), transparent 72%),
+    radial-gradient(ellipse 46% 52% at 80% 52%, rgba(120, 172, 138, .55), transparent 72%),
+    radial-gradient(ellipse 34% 30% at 50% 12%, rgba(236, 226, 150, .5), transparent 72%),
+    radial-gradient(ellipse 30% 40% at 30% 88%, rgba(180, 214, 150, .5), transparent 72%),
+    linear-gradient(var(--grass), var(--grass-dark));
+  filter: url(#wc-ground);
+}
+html[data-wc="1"] .tuft svg { opacity: .78; }
+/* đất nhòe mép nên lót một dải cỏ phía sau ở đáy màn hình để không hở giấy (không đổi kích thước #ground nên vị trí hoa và đường giữ nguyên) */
+html[data-wc="1"] #garden::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; z-index: -1;
+  background: linear-gradient(transparent, var(--grass-dark));
+}
+/* hoa */
+html[data-wc="1"] .flower { filter: url(#wc-flower); }
+html[data-wc="1"] .flower.gift { filter: url(#wc-flower) grayscale(1) contrast(1.15); }
+html[data-wc="1"] .flower.moving { filter: url(#wc-flower) drop-shadow(0 8px 10px rgba(110, 80, 110, .3)); }
+html[data-wc="1"] .flower.moving.blocked { filter: url(#wc-flower) drop-shadow(0 0 10px #e0453a) saturate(.6); }
+html[data-wc="1"] .card-art svg { filter: url(#wc-flower); }
+html[data-wc="1"] .bee, html[data-wc="1"] .bf, html[data-wc="1"] #bin .bin-svg, html[data-wc="1"] #net svg, html[data-wc="1"] #trash-can svg { filter: url(#wc-icon); }
+/* chữ rơi + cục phân: mép mềm hơn */
+html[data-wc="1"] .fallen { box-shadow: 0 2px 8px var(--wc-shadow); border-color: var(--wc-line); background: rgba(255, 252, 244, .92); }
+
+/* các nút: bo mềm không đều như viền vẽ tay, bóng nhẹ ánh hồng */
+html[data-wc="1"] #toolbar button, html[data-wc="1"] #seed-toggle, html[data-wc="1"] #seed-form button, html[data-wc="1"] #mode-cancel,
+html[data-wc="1"] .card-actions button, html[data-wc="1"] #react-bar button, html[data-wc="1"] .edit-actions button,
+html[data-wc="1"] .date-field button, html[data-wc="1"] #zone-nav {
+  background: rgba(255, 251, 243, .92); border: 1.5px solid var(--wc-line);
+  border-radius: 20px 24px 20px 26px / 24px 20px 26px 20px;
+  box-shadow: 0 3px 12px var(--wc-shadow), inset 0 0 14px rgba(255, 255, 255, .75);
+}
+html[data-wc="1"] #toolbar button:hover, html[data-wc="1"] #seed-toggle:hover, html[data-wc="1"] .card-actions button:hover { background: #fdeef0; }
+html[data-wc="1"] #basket-count, html[data-wc="1"] #gifts-count, html[data-wc="1"] #lab-btn-count { background: var(--wc-line); }
+html[data-wc="1"] #bin, html[data-wc="1"] #who { border-color: var(--wc-line); box-shadow: 0 3px 12px var(--wc-shadow); }
+/* bảng, hộp: giấy kem, viền hồng nhạt, bóng ánh tím */
+html[data-wc="1"] #poem-panel, html[data-wc="1"] #basket-box, html[data-wc="1"] #log-box, html[data-wc="1"] #search-box,
+html[data-wc="1"] #help-box, html[data-wc="1"] #edit-box, html[data-wc="1"] #seedgift-box, html[data-wc="1"] #draw-box,
+html[data-wc="1"] #trash-box, html[data-wc="1"] #paper-box, html[data-wc="1"] #theme-box, html[data-wc="1"] #gift-box,
+html[data-wc="1"] .gate-card, html[data-wc="1"] .card, html[data-wc="1"] #note-box {
+  background-color: #fffaf1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 .55  0 0 0 0 .45  0 0 0 0 .4  0 0 0 .08 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  border: 1px solid rgba(201, 163, 178, .55);
+  border-radius: 24px 28px 22px 26px / 26px 22px 28px 24px;
+  box-shadow: 0 12px 40px rgba(140, 100, 132, .3), inset 0 0 30px rgba(246, 214, 224, .35);
+}
+html[data-wc="1"] #zone-previews .zp-card, html[data-wc="1"] .sr-item, html[data-wc="1"] .sg-item { border-color: var(--wc-line); background: rgba(255, 252, 246, .95); }
+html[data-wc="1"] #help-body h3 { color: #b0708a; border-color: rgba(201, 163, 178, .5); }
+html[data-wc="1"] #praise-pop span { border-color: var(--wc-line); color: #b0587a; box-shadow: 0 10px 40px var(--wc-shadow); }
+html[data-wc="1"] #lab-scene { border-radius: 26px; }
+html[data-wc="1"] .paper { filter: url(#wc-icon); }

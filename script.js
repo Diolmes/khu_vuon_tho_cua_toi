@@ -55,7 +55,8 @@ let pickedWord = null;  // từ đang được chọn
 let mode = null;        // {type:"place", id} | {type:"fert"}
 
 // ---------- Hình hoa (SVG, viewBox 100 x 150) ----------
-const GREEN = "#5e7f4b";
+const TK = window.THEME_TOKENS || {};       // màu vẽ bằng JS lấy từ bảng theme (theme.js)
+const GREEN = TK.stem || "#5e7f4b";
 const stem = (x1, y1, x2, y2, w = 5) =>
   `<path d="M${x1} ${y1} Q${(x1 + x2) / 2 + 4} ${(y1 + y2) / 2} ${x2} ${y2}" stroke="${GREEN}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
 const leaf = (cx, cy, rx, ry, rot, fill = GREEN) =>
@@ -1059,10 +1060,10 @@ $("basket-overlay").addEventListener("click", (e) => { if (e.target === $("baske
   svg.setAttribute("viewBox", "0 0 100 100");
   svg.setAttribute("preserveAspectRatio", "none");
   svg.innerHTML = `
-    <path d="M40 100 C42 82 58 74 54 58 C51 46 44 40 49 26 C51 20 53 14 53.5 8 L55.5 8 C56 14 59 22 58 28 C56 42 70 48 70 62 C70 78 62 88 66 100 Z" fill="#e8d3a2"/>
-    <path d="M40 100 C42 82 58 74 54 58 C51 46 44 40 49 26 C51 20 53 14 53.5 8" fill="none" stroke="#d4bb82" stroke-width=".7" stroke-linecap="round"/>
-    <path d="M66 100 C62 88 70 78 70 62 C70 48 56 42 58 28 C59 22 56 14 55.5 8" fill="none" stroke="#d4bb82" stroke-width=".7" stroke-linecap="round"/>
-    <g fill="#c9b283">
+    <path d="M40 100 C42 82 58 74 54 58 C51 46 44 40 49 26 C51 20 53 14 53.5 8 L55.5 8 C56 14 59 22 58 28 C56 42 70 48 70 62 C70 78 62 88 66 100 Z" fill="${TK.path || "#e8d3a2"}"/>
+    <path d="M40 100 C42 82 58 74 54 58 C51 46 44 40 49 26 C51 20 53 14 53.5 8" fill="none" stroke="${TK.pathEdge || "#d4bb82"}" stroke-width=".7" stroke-linecap="round"/>
+    <path d="M66 100 C62 88 70 78 70 62 C70 48 56 42 58 28 C59 22 56 14 55.5 8" fill="none" stroke="${TK.pathEdge || "#d4bb82"}" stroke-width=".7" stroke-linecap="round"/>
+    <g fill="${TK.pathDots || "#c9b283"}">
       <ellipse cx="52" cy="90" rx="1.6" ry=".9"/><ellipse cx="58" cy="82" rx="1.2" ry=".7"/>
       <ellipse cx="55" cy="68" rx="1" ry=".6"/><ellipse cx="62" cy="58" rx="1" ry=".55"/>
       <ellipse cx="52" cy="46" rx=".8" ry=".45"/><ellipse cx="53" cy="30" rx=".6" ry=".35"/>
@@ -1071,7 +1072,7 @@ $("basket-overlay").addEventListener("click", (e) => { if (e.target === $("baske
 
   // cỏ rải rác (tránh lòng đường)
   const blade = (c) => `<svg viewBox="0 0 26 20"><path d="M3 20 Q4 8 1 3 Q7 8 9 20 M10 20 Q11 5 12 0 Q17 7 16 20 M17 20 Q19 9 24 4 Q22 12 23 20" fill="${c}"/></svg>`;
-  const greens = ["#8fb96a", "#7aa85a", "#a3c97c", "#6f9c52"];
+  const greens = TK.tufts || ["#8fb96a", "#7aa85a", "#a3c97c", "#6f9c52"];
   for (let i = 0; i < 46; i++) {
     const y = rand(10, 98);                       // % chiều cao vùng đất
     const roadL = 40 + (60 - 40) * 0, roadR = 70;  // xấp xỉ bề ngang đường, hẹp dần lên trên
@@ -2093,7 +2094,7 @@ $("zone-label").addEventListener("click", () => {
 updateZoneUI();
 
 const anyOverlayOpen = () => !$("gate").hidden ||
-  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay", "lab-overlay", "paper-overlay", "trash-overlay", "help-overlay"].some((id) => !$(id).hidden);
+  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay", "lab-overlay", "paper-overlay", "trash-overlay", "help-overlay", "theme-overlay"].some((id) => $(id) && !$(id).hidden);
 
 // Cuộn chuột / trượt ngón tay để đi giữa các khu: cuộn xuống = lùi về khu cũ hơn ("phía sau" khu vườn)
 let wheelAcc = 0, wheelLocked = false, wheelTimer = null;
