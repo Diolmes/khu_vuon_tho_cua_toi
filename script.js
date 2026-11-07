@@ -698,7 +698,7 @@ function openPoem(id, fromBasket = false) {
 function renderPoem(p) {
   poemMeta.textContent = [
     p.gift ? `🎁 hạt giống tặng từ ${p.from || "một người bạn"}` : p.hybrid ? "chùm thơ lai · 2 bài" : "",
-    p.written ? `viết ngày ${fmtWritten(p.written)}` : "",
+    p.written ? `viết ${writtenPrefix(p.written)} ${fmtWritten(p.written)}` : "",
   ].filter(Boolean).join(" · ");
   poemText.innerHTML = "";
   p.texts.forEach((text, pi) => {
@@ -2019,7 +2019,9 @@ $("demo-exit").addEventListener("click", exitDemo);
 
 // ================= Vườn vô tận: mỗi khu là một năm =================
 const pad2 = (n) => String(n).padStart(2, "0");
-const yearOf = (w) => { const m = /^(\d{4})-/.exec(w || ""); return m ? parseInt(m[1], 10) : 0; };
+// ngày viết lưu dạng "YYYY" | "YYYY-MM" | "YYYY-MM-DD": năm bắt buộc, tháng và ngày có thể bỏ trống
+const parseWritten = (w) => { const m = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(w || ""); return m ? { y: m[1], m: m[2] || "", d: m[3] || "" } : null; };
+const yearOf = (w) => { const p = parseWritten(w); return p ? parseInt(p.y, 10) : 0; };
 function newestZone() {
   let n = new Date().getFullYear();
   state.poems.forEach((p) => { if (p.status === "garden") { const y = yearOf(p.written); if (y > n) n = y; } });
@@ -2370,14 +2372,15 @@ function startFlowerHold(e, id, el) {
 
 // ----- Sửa bài thơ + ngày viết (chủ vườn) -----
 let editId = null;
-const fmtWritten = (w) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(w || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+const writtenPrefix = (w) => { const p = parseWritten(w); return !p ? "ngày" : p.d ? "ngày" : p.m ? "tháng" : "năm"; };
+const fmtWritten = (w) => { const p = parseWritten(w); return p ? [p.d, p.m, p.y].filter(Boolean).join("/") : ""; };
 function openEdit(id) {
   const p = getPoem(id);
   if (!isOwner() || !p) return;
   editId = id;
   $("edit-text").value = p.texts[0];
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(p.written || "");
-  $("d-dd").value = m ? m[3] : ""; $("d-mm").value = m ? m[2] : ""; $("d-yyyy").value = m ? m[1] : "";
+  const m = parseWritten(p.written);
+  $("d-dd").value = m ? m.d : ""; $("d-mm").value = m ? m.m : ""; $("d-yyyy").value = m ? m.y : "";
   $("edit-err").textContent = "";
   $("edit-overlay").hidden = false;
   setTimeout(() => $("edit-text").focus(), 50);
@@ -2396,11 +2399,17 @@ $("d-today").addEventListener("click", () => {
 $("d-clear").addEventListener("click", () => { $("d-dd").value = ""; $("d-mm").value = ""; $("d-yyyy").value = ""; });
 function readDateInputs() {
   const d = $("d-dd").value.trim(), m = $("d-mm").value.trim(), y = $("d-yyyy").value.trim();
-  if (!d && !m && !y) return { ok: true, value: "" };
-  const dd = +d, mm = +m, yy = +y;
-  if (!dd || !mm || y.length !== 4) return { ok: false, err: "Điền đủ ngày / tháng / năm (năm 4 chữ số), hoặc để trống hết." };
+  if (!d && !m && !y) return { ok: true, value: "" };                      // để trống hết: bài chưa có ngày viết
+  if (y.length !== 4) return { ok: false, err: "Năm là bắt buộc (4 chữ số). Tháng và ngày thì có thể để trống." };
+  const yy = +y, mm = +m, dd = +d;
+  if (yy < MIN_ZONE) return { ok: false, err: `Trước năm ${MIN_ZONE} vườn chưa có thơ, hãy chọn năm ${MIN_ZONE} trở đi.` };
+  if (!m) {
+    if (d) return { ok: false, err: "Có ngày thì cần có tháng, hoặc bỏ trống cả ngày." };
+    return { ok: true, value: y };
+  }
+  if (mm < 1 || mm > 12) return { ok: false, err: "Tháng phải từ 1 đến 12." };
+  if (!d) return { ok: true, value: `${y}-${pad2(mm)}` };
   const dt = new Date(yy, mm - 1, dd);
-  if (yy < MIN_ZONE) return { ok: false, err: `Trước năm ${MIN_ZONE} vườn chưa có thơ, hãy chọn ngày từ năm ${MIN_ZONE} trở đi.` };
   if (dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return { ok: false, err: "Ngày này không có thật, kiểm tra lại nhé." };
   return { ok: true, value: `${y}-${pad2(mm)}-${pad2(dd)}` };
 }

@@ -65,7 +65,7 @@ Hoa đã hái nằm trong giỏ. Bấm vào bông trong giỏ để đọc thơ.
 
 Mở bài thơ, bấm **✏️ sửa bài thơ**:
 - Sửa chữ trong ô bài thơ. Khi sửa chữ, các chữ đã rơi của bông này được làm mới (hoa khỏe lại).
-- **Ngày viết**: chọn **Hôm nay**, hoặc gõ ba ô **DD / MM / YYYY** (năm 4 chữ số, từ 2021 trở đi), hoặc **Bỏ ngày** để xóa.
+- **Ngày viết**: chọn **Hôm nay**, hoặc gõ ba ô **DD / MM / YYYY**, hoặc **Bỏ ngày** để xóa. **Năm là bắt buộc** (4 chữ số, từ 2021 trở đi); tháng và ngày có thể bỏ trống (có ngày thì cần có tháng). Ví dụ chỉ điền `2023` thì bài hiện "viết năm 2023", điền thêm tháng thì hiện "viết tháng 03/2023", điền đủ thì hiện "viết ngày 15/03/2023".
 - Có ngày thì hoa chuyển về khu của năm đó. Xóa ngày thì hoa trở về khu mới nhất. Web báo hoa chuyển sang khu nào.
 - Bài lai (do ong sinh ra) không sửa được. Hoa lai tự mang ngày viết của bông mẹ.
 
