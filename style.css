@@ -30,7 +30,7 @@ header {
   pointer-events: none;
 }
 header h1 { margin: 0; font-size: 1.6rem; font-weight: normal; }
-.sub { margin: 2px 0 0; font-size: .9rem; opacity: .6; font-style: italic; }
+.sub { margin: 6px 0 0; font-size: .9rem; opacity: .6; font-style: italic; }
 
 /* ---------- Bầu trời: mây + mưa ---------- */
 #sky {
@@ -568,9 +568,9 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 
 /* màn hình vừa: thanh công cụ dài hơn tiêu đề thì xuống ngay dưới tiêu đề, khỏi đè lên nhau */
 @media (min-width: 901px) and (max-width: 1560px) {
-  #toolbar { top: calc(74px + env(safe-area-inset-top)); left: 0; right: 0; justify-content: center; flex-wrap: wrap; gap: 6px; }
-  #mode-banner { top: calc(122px + env(safe-area-inset-top)); }
-  #poem-panel { top: calc(126px + env(safe-area-inset-top)); max-height: calc(100vh - 256px); }
+  #toolbar { top: calc(92px + env(safe-area-inset-top)); left: 0; right: 0; justify-content: center; flex-wrap: wrap; gap: 8px; }
+  #mode-banner { top: calc(140px + env(safe-area-inset-top)); }
+  #poem-panel { top: calc(144px + env(safe-area-inset-top)); max-height: calc(100vh - 274px); }
 }
 
 /* màn hình rất lớn */
@@ -592,7 +592,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
     gap: 6px;
   }
   #mode-banner { top: calc(122px + env(safe-area-inset-top)); }
-  #poem-panel { top: calc(126px + env(safe-area-inset-top)); max-height: calc(100vh - 256px); }
+  #poem-panel { top: calc(144px + env(safe-area-inset-top)); max-height: calc(100vh - 274px); }
   #poem-panel { width: min(340px, calc(100vw - 32px)); }
 }
 
