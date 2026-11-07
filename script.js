@@ -747,7 +747,6 @@ applyAlign();
 
 function closePanel() {
   stopReactions();
-  $("react-msg").hidden = true;
   panel.hidden = true;
   panelFromBasket = false;
   openId = null;
@@ -757,7 +756,7 @@ function closePanel() {
 $("panel-close").addEventListener("click", closePanel);
 // Bấm ra ngoài bảng thơ là đóng (không cần bấm ×). Bấm vào một bông hoa thì để hoa đó tự mở bài của nó.
 document.addEventListener("pointerdown", (e) => {
-  if (panel.hidden) return;
+  if (panel.hidden || !$("note-overlay").hidden) return;
   if (panel.contains(e.target) || e.target.closest(".flower, .card-art")) return;
   closePanel();
 });
@@ -2087,7 +2086,7 @@ $("zone-label").addEventListener("click", () => {
 updateZoneUI();
 
 const anyOverlayOpen = () => !$("gate").hidden ||
-  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay", "lab-overlay", "paper-overlay", "trash-overlay"].some((id) => !$(id).hidden);
+  ["basket-overlay", "gift-overlay", "seedgift-overlay", "log-overlay", "draw-overlay", "search-overlay", "edit-overlay", "note-overlay", "lab-overlay", "paper-overlay", "trash-overlay", "help-overlay"].some((id) => !$(id).hidden);
 
 // Cuộn chuột / trượt ngón tay để đi giữa các khu: cuộn xuống = lùi về khu cũ hơn ("phía sau" khu vườn)
 let wheelAcc = 0, wheelLocked = false, wheelTimer = null;
@@ -2460,7 +2459,6 @@ function watchReactions(id) {
 // các nút/chữ phụ trong bảng thơ tùy vai trò
 function setupPanelExtras(p, fromBasket) {
   $("react-bar").hidden = isOwner() || fromBasket;
-  $("react-msg").hidden = true;
   $("edit-btn").style.display = isOwner() && !p.hybrid ? "" : "none";
   watchReactions(p.id);
 }
@@ -2470,10 +2468,11 @@ function react(kind) {
   reactBusyUntil = Date.now() + 6000;
   db.ref("reactions/" + p.id).push().set({ name: ME.name, uid: ME.uid, kind, t: SV.TIMESTAMP }).catch(() => {});
   if (kind === "praise") {
-    const m = $("react-msg");
-    m.textContent = "chà bông hoa thơm quá";
-    m.hidden = false;
-    setTimeout(() => { closePanel(); announcePraise(p.id); }, 1500);
+    // lời khen hiện giữa màn hình cho dễ đọc, xong mới đóng bảng thơ và gọi đàn bướm
+    const pop = $("praise-pop");
+    pop.hidden = false;
+    pop.classList.remove("show"); pop.offsetWidth; pop.classList.add("show");
+    setTimeout(() => { pop.hidden = true; closePanel(); announcePraise(p.id); }, 2300);
   } else {
     $("note-overlay").hidden = false;
   }
@@ -2481,7 +2480,6 @@ function react(kind) {
 $("praise-btn").addEventListener("click", () => react("praise"));
 $("tease-btn").addEventListener("click", () => react("tease"));
 $("note-ok").addEventListener("click", () => { $("note-overlay").hidden = true; });
-$("note-overlay").addEventListener("click", (e) => { if (e.target === $("note-overlay")) $("note-overlay").hidden = true; });
 
 function announcePraise(poemId) {
   const ref = db.ref("garden/praise").push();
@@ -2708,6 +2706,100 @@ $("trash-compost").addEventListener("click", () => {
   $("trash-overlay").hidden = true;
   toast("Đã đổ giấy vào thùng phân hữu cơ 🌱");
 });
+
+
+// ----- Hướng dẫn dạo vườn (khách) / Sổ tay vườn (chủ vườn): đọc từ file hướng dẫn trong thư mục web -----
+const HELP_FILES = { guest: "HUONG-DAN-KHACH.md", owner: "HUONG-DAN-CHU-VUON.md" };
+const helpCache = {};
+function mdInline(parent, text) {
+  text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).forEach((part) => {
+    if (!part) return;
+    if (part.length > 4 && part.startsWith("**") && part.endsWith("**")) { const b = document.createElement("b"); b.textContent = part.slice(2, -2); parent.append(b); }
+    else if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) { const c = document.createElement("code"); c.textContent = part.slice(1, -1); parent.append(c); }
+    else parent.append(part);
+  });
+}
+// đổi Markdown đơn giản (tiêu đề, danh sách lồng nhau, bảng, in đậm, mã) thành các phần tử trang, không dùng innerHTML
+function renderMarkdown(md, root) {
+  root.innerHTML = "";
+  const lines = md.replace(/\r/g, "").split("\n");
+  let i = 0, lists = [];
+  while (i < lines.length) {
+    const line = lines[i];
+    let m;
+    if (!line.trim()) { lists = []; i++; continue; }
+    if ((m = /^(#{1,3})\s+(.*)$/.exec(line))) {
+      lists = [];
+      if (m[1] !== "#") { const h = document.createElement(m[1] === "##" ? "h3" : "h4"); mdInline(h, m[2]); root.append(h); }
+      i++; continue;                                      // tiêu đề cấp 1 đã có ở tên hộp
+    }
+    if (/^---+\s*$/.test(line)) { lists = []; root.append(document.createElement("hr")); i++; continue; }
+    if (line.trim().startsWith("|")) {
+      lists = [];
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const cells = lines[i].trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+        if (!cells.every((c) => /^:?-+:?$/.test(c))) rows.push(cells);
+        i++;
+      }
+      const wrap = document.createElement("div");
+      wrap.className = "md-table";
+      const table = document.createElement("table");
+      rows.forEach((cells, r) => {
+        const tr = document.createElement("tr");
+        cells.forEach((c) => { const td = document.createElement(r === 0 ? "th" : "td"); mdInline(td, c); tr.append(td); });
+        table.append(tr);
+      });
+      wrap.append(table);
+      root.append(wrap);
+      continue;
+    }
+    if ((m = /^(\s*)([-*]|\d+\.)\s+(.*)$/.exec(line))) {
+      const indent = m[1].length, ordered = /\d/.test(m[2]);
+      while (lists.length && lists[lists.length - 1].indent > indent) lists.pop();
+      let top = lists[lists.length - 1];
+      if (!top || top.indent < indent) {
+        const el = document.createElement(ordered ? "ol" : "ul");
+        if (top && top.last) top.last.append(el); else root.append(el);
+        top = { indent, el, last: null };
+        lists.push(top);
+      }
+      const li = document.createElement("li");
+      mdInline(li, m[3]);
+      top.el.append(li);
+      top.last = li;
+      i++; continue;
+    }
+    lists = [];
+    const p = document.createElement("p");
+    mdInline(p, line.trim());
+    root.append(p);
+    i++;
+  }
+}
+async function openHelp(kind) {
+  if (anyOverlayOpen()) return;
+  $("help-title").textContent = kind === "owner" ? "Sổ tay vườn" : "Hướng dẫn dạo vườn";
+  const body = $("help-body");
+  body.textContent = "Đang mở sổ...";
+  $("help-overlay").hidden = false;
+  $("help-box").scrollTop = 0;
+  try {
+    if (!helpCache[kind]) {
+      const r = await fetch(HELP_FILES[kind], { cache: "no-cache" });
+      if (!r.ok) throw new Error(r.status);
+      helpCache[kind] = await r.text();
+    }
+    renderMarkdown(helpCache[kind], body);
+  } catch {
+    body.textContent = "Chưa mở được phần hướng dẫn (cần có mạng, và web phải chứa file " + HELP_FILES[kind] + ").";
+  }
+}
+function closeHelp() { $("help-overlay").hidden = true; }
+$("guide-btn").addEventListener("click", () => openHelp("guest"));
+$("notebook-btn").addEventListener("click", () => openHelp("owner"));
+$("help-close").addEventListener("click", closeHelp);
+$("help-overlay").addEventListener("click", (e) => { if (e.target === $("help-overlay")) closeHelp(); });
 
 // ---------- Ai đang trong vườn + con trỏ ----------
 const peers = {};            // uid -> {name, role, x, y, t}
@@ -3188,10 +3280,11 @@ function startGarden() {
 // ---------- Phím tắt ----------
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!$("paper-overlay").hidden) closePaper();
+  if (!$("note-overlay").hidden) return;                 // lời nhắn chê hoa: chỉ bấm "Dạ" mới đóng
+  if (!$("help-overlay").hidden) closeHelp();
+  else if (!$("paper-overlay").hidden) closePaper();
   else if (!$("trash-overlay").hidden) $("trash-overlay").hidden = true;
   else if (!$("lab-overlay").hidden) closeLab();
-  else if (!$("note-overlay").hidden) $("note-overlay").hidden = true;
   else if (!$("edit-overlay").hidden) closeEdit();
   else if (!$("search-overlay").hidden) closeSearch();
   else if (!$("draw-overlay").hidden) closeDraw();

@@ -691,6 +691,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 
 /* ---------- Vai trò: khách không gieo hạt, không cho ong; chủ vườn mới có nhật ký/sao lưu/nhập ---------- */
 .guest #gifts-btn,
+.guest #notebook-btn,
 .guest #lab-btn,
 .guest #bee-btn,
 .guest #log-btn,
@@ -700,6 +701,7 @@ header { padding-top: calc(14px + env(safe-area-inset-top)); }
 .demo #export-btn,
 .demo #import-btn,
 body:not(.guest) #demo-btn,
+body:not(.guest) #guide-btn,
 body:not(.guest) #avatar-btn { display: none !important; }
 
 /* ---------- Cổng vào ---------- */
@@ -1143,13 +1145,12 @@ body.locked #zone-nav { visibility: hidden; }
   color: #6b7f9a; cursor: pointer; text-decoration: underline; padding: 0;
 }
 #react-bar { display: flex; gap: 8px; margin: 4px 0 10px; }
-#react-bar[hidden], #react-msg[hidden], #react-log[hidden] { display: none; }
+#react-bar[hidden], #react-log[hidden] { display: none; }
 #react-bar button {
   font: inherit; font-size: .85rem; background: var(--card); color: var(--ink);
   border: 2px solid var(--accent); border-radius: 999px; padding: 4px 14px; cursor: pointer;
 }
 #react-bar button:hover { background: #ffeef2; }
-#react-msg { margin: 0 0 10px; font-style: italic; color: #b8527a; animation: pop .3s ease-out; }
 #react-log { margin: 8px 0 10px; font-size: .82rem; }
 #react-log b { font-weight: normal; opacity: .65; }
 #react-empty { margin: 2px 0; font-style: italic; opacity: .55; }
@@ -1272,3 +1273,49 @@ body.locked #zone-nav { visibility: hidden; }
   #lab-desk { flex-direction: column; }
   .paper span { font-size: .62rem; }
 }
+
+/* ---------- Lời khen giữa màn hình ---------- */
+#praise-pop {
+  position: fixed; inset: 0; z-index: 80; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+#praise-pop[hidden] { display: none; }
+#praise-pop span {
+  font-size: clamp(1.5rem, 5vw, 2.4rem); font-style: italic; color: #b8527a; text-align: center;
+  background: rgba(255, 253, 247, .96); border: 3px solid var(--accent); border-radius: 26px;
+  padding: 22px 38px; box-shadow: 0 10px 40px rgba(120, 60, 80, .3);
+}
+#praise-pop.show span { animation: praisePop 2.3s ease-out forwards; }
+@keyframes praisePop {
+  0% { opacity: 0; transform: scale(.7); }
+  14% { opacity: 1; transform: scale(1.06); }
+  24% { transform: scale(1); }
+  82% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.96) translateY(-10px); }
+}
+
+/* ---------- Hướng dẫn dạo vườn / Sổ tay vườn ---------- */
+#help-overlay {
+  position: fixed; inset: 0; z-index: 48; background: rgba(70, 50, 40, .4);
+  display: flex; align-items: center; justify-content: center; padding: 12px;
+}
+#help-overlay[hidden] { display: none; }
+#help-box {
+  position: relative; width: min(640px, 100%); max-height: 90vh; overflow: auto;
+  background: var(--card); border-radius: 22px; padding: 22px 24px 20px; animation: pop .3s ease-out;
+}
+#help-box h2 { margin: 0 0 12px; font-weight: normal; font-size: 1.35rem; }
+#help-close { position: absolute; top: 6px; right: 12px; border: none; background: none; font-size: 1.7rem; color: var(--ink); opacity: .5; cursor: pointer; }
+#help-close:hover { opacity: 1; }
+#help-body { font-size: .95rem; line-height: 1.65; }
+#help-body h3 { margin: 18px 0 6px; font-size: 1.1rem; font-weight: normal; color: #b8527a; border-bottom: 1px solid #eadfcc; padding-bottom: 3px; }
+#help-body h4 { margin: 12px 0 4px; font-size: 1rem; font-weight: bold; }
+#help-body p { margin: 6px 0; }
+#help-body ul, #help-body ol { margin: 4px 0 6px; padding-left: 22px; }
+#help-body li { margin: 2px 0; }
+#help-body code { background: #f5ecda; border-radius: 4px; padding: 0 4px; font-size: .88em; }
+#help-body hr { border: none; border-top: 1px solid #eadfcc; margin: 14px 0; }
+.md-table { overflow-x: auto; margin: 8px 0; }
+.md-table table { border-collapse: collapse; font-size: .88rem; }
+.md-table th, .md-table td { border: 1px solid #eadfcc; padding: 4px 9px; text-align: left; vertical-align: top; }
+.md-table th { background: #fff3d6; font-weight: normal; }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Khu vườn thơ của tôi</title>
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
   <div id="sky" aria-hidden="true"></div>
@@ -26,6 +26,8 @@
 
   <!-- Thanh công cụ -->
   <div id="toolbar">
+    <button id="guide-btn" type="button" title="Hướng dẫn dạo vườn">📖 Hướng dẫn</button>
+    <button id="notebook-btn" type="button" title="Sổ tay vườn">📒 Sổ tay</button>
     <button id="search-btn" type="button" title="Tìm hoa theo từ khóa">🔍 Tìm hoa</button>
     <button id="basket-btn" type="button">🧺 Giỏ <span id="basket-count">0</span></button>
     <button id="avatar-btn" type="button" title="Vẽ nhân vật của bạn để đi dạo trong vườn">🎨 Nhân vật</button>
@@ -110,7 +112,6 @@
       <button type="button" id="praise-btn">🌸 Khen hoa</button>
       <button type="button" id="tease-btn">🙅 Chê hoa</button>
     </div>
-    <p id="react-msg" hidden>chà bông hoa thơm quá</p>
     <div id="react-log" hidden>
       <b>📖 Ai đã khen / chê</b>
       <p id="react-empty">Chưa ai khen hay chê bông hoa này.</p>
@@ -269,6 +270,18 @@
     </form>
   </div>
 
+  <!-- Lời khen hiện giữa màn hình -->
+  <div id="praise-pop" hidden><span>chà bông hoa thơm quá</span></div>
+
+  <!-- Hướng dẫn dạo vườn (khách) / Sổ tay vườn (chủ vườn) -->
+  <div id="help-overlay" hidden>
+    <div id="help-box">
+      <button id="help-close" type="button" aria-label="Đóng">×</button>
+      <h2 id="help-title">Hướng dẫn dạo vườn</h2>
+      <div id="help-body"></div>
+    </div>
+  </div>
+
   <!-- Lời nhắn khi chê hoa -->
   <div id="note-overlay" hidden>
     <div id="note-box">
@@ -354,8 +367,8 @@
 
   <div id="toast" role="status"></div>
 
-  <script src="firebase-config.js?v=23"></script>
-  <script src="backend.js?v=23"></script>
-  <script src="script.js?v=23"></script>
+  <script src="firebase-config.js?v=24"></script>
+  <script src="backend.js?v=24"></script>
+  <script src="script.js?v=24"></script>
 </body>
 </html>
