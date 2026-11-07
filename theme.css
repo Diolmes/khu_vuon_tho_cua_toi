@@ -51,36 +51,36 @@ html[data-wc="1"] .ic svg { filter: url(#wc-icon); }
 html[data-wc="1"] body {
   background:
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='3'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .42  0 0 0 0 .36  0 0 0 .1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
-    radial-gradient(60% 38% at 14% 8%, rgba(176, 208, 238, .8), transparent 72%),
-    radial-gradient(48% 34% at 86% 16%, rgba(246, 196, 214, .6), transparent 72%),
-    radial-gradient(40% 26% at 52% 30%, rgba(252, 230, 190, .55), transparent 72%),
+    radial-gradient(60% 38% at 14% 8%, rgba(150, 192, 232, .95), transparent 74%),
+    radial-gradient(48% 34% at 86% 16%, rgba(244, 176, 200, .78), transparent 74%),
+    radial-gradient(40% 26% at 52% 30%, rgba(252, 220, 165, .7), transparent 74%),
     linear-gradient(var(--sky-top), var(--sky-bottom));
 }
 /* mây: nhòe như vệt nước trắng loang */
-html[data-wc="1"] .cloud { background: rgba(255, 255, 255, .78); filter: blur(7px); opacity: .8; }
-html[data-wc="1"] .cloud::before, html[data-wc="1"] .cloud::after { background: rgba(255, 255, 255, .78); }
+html[data-wc="1"] .cloud { background: rgba(255, 255, 255, .94); filter: blur(4px); opacity: .95; }
+html[data-wc="1"] .cloud::before, html[data-wc="1"] .cloud::after { background: rgba(255, 255, 255, .94); }
 /* đất: nhiều mảng xanh loang chồng nhau, mép đồi nhòe */
 html[data-wc="1"] #ground {
   background:
-    radial-gradient(ellipse 42% 52% at 16% 34%, rgba(150, 202, 150, .6), transparent 72%),
-    radial-gradient(ellipse 46% 52% at 80% 52%, rgba(120, 172, 138, .55), transparent 72%),
-    radial-gradient(ellipse 34% 30% at 50% 12%, rgba(236, 226, 150, .5), transparent 72%),
-    radial-gradient(ellipse 30% 40% at 30% 88%, rgba(180, 214, 150, .5), transparent 72%),
+    radial-gradient(ellipse 42% 52% at 16% 34%, rgba(120, 184, 128, .78), transparent 74%),
+    radial-gradient(ellipse 46% 52% at 80% 52%, rgba(92, 156, 112, .72), transparent 74%),
+    radial-gradient(ellipse 34% 30% at 50% 12%, rgba(226, 214, 120, .65), transparent 74%),
+    radial-gradient(ellipse 30% 40% at 30% 88%, rgba(150, 200, 120, .65), transparent 74%),
     linear-gradient(var(--grass), var(--grass-dark));
   filter: url(#wc-ground);
 }
-html[data-wc="1"] .tuft svg { opacity: .78; }
+html[data-wc="1"] .tuft svg { opacity: 1; }
 /* đất nhòe mép nên lót một dải cỏ phía sau ở đáy màn hình để không hở giấy (không đổi kích thước #ground nên vị trí hoa và đường giữ nguyên) */
 html[data-wc="1"] #garden::before {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; z-index: -1;
   background: linear-gradient(transparent, var(--grass-dark));
 }
 /* hoa */
-html[data-wc="1"] .flower { filter: url(#wc-flower); }
-html[data-wc="1"] .flower.gift { filter: url(#wc-flower) grayscale(1) contrast(1.15); }
-html[data-wc="1"] .flower.moving { filter: url(#wc-flower) drop-shadow(0 8px 10px rgba(110, 80, 110, .3)); }
+html[data-wc="1"] .flower { filter: url(#wc-flower) saturate(1.28) contrast(1.06); }
+html[data-wc="1"] .flower.gift { filter: url(#wc-flower) grayscale(1) contrast(1.2); }
+html[data-wc="1"] .flower.moving { filter: url(#wc-flower) saturate(1.28) drop-shadow(0 8px 10px rgba(110, 80, 110, .3)); }
 html[data-wc="1"] .flower.moving.blocked { filter: url(#wc-flower) drop-shadow(0 0 10px #e0453a) saturate(.6); }
-html[data-wc="1"] .card-art svg { filter: url(#wc-flower); }
+html[data-wc="1"] .card-art svg { filter: url(#wc-flower) saturate(1.2); }
 html[data-wc="1"] .bee, html[data-wc="1"] .bf, html[data-wc="1"] #bin .bin-svg, html[data-wc="1"] #net svg, html[data-wc="1"] #trash-can svg { filter: url(#wc-icon); }
 /* chữ rơi + cục phân: mép mềm hơn */
 html[data-wc="1"] .fallen { box-shadow: 0 2px 8px var(--wc-shadow); border-color: var(--wc-line); background: rgba(255, 252, 244, .92); }
@@ -112,3 +112,59 @@ html[data-wc="1"] #help-body h3 { color: #b0708a; border-color: rgba(201, 163, 1
 html[data-wc="1"] #praise-pop span { border-color: var(--wc-line); color: #b0587a; box-shadow: 0 10px 40px var(--wc-shadow); }
 html[data-wc="1"] #lab-scene { border-radius: 26px; }
 html[data-wc="1"] .paper { filter: url(#wc-icon); }
+
+/* ======================= THEME DOODLE ======================= */
+html[data-fx="doodle"] .ic svg { filter: url(#dd-icon) saturate(1.6); }
+html[data-fx="doodle"] h1, html[data-fx="doodle"] h2, html[data-fx="doodle"] .lab-sign { font-weight: 600; letter-spacing: 0; }
+/* giấy vở: kẻ ngang xanh nhạt, lề đỏ bên trái */
+html[data-fx="doodle"] body {
+  background:
+    linear-gradient(90deg, transparent 58px, rgba(255, 110, 110, .55) 58px 60px, transparent 60px),
+    repeating-linear-gradient(transparent 0 33px, rgba(110, 165, 225, .38) 33px 34px),
+    var(--sky-bottom);
+}
+html[data-fx="doodle"] .cloud { background: #fff; opacity: 1; filter: url(#dd-flower); }
+html[data-fx="doodle"] .cloud::before, html[data-fx="doodle"] .cloud::after { background: #fff; }
+/* đất: xanh phẳng + nét gạch chéo như tô bút, mép đồi có viền mực */
+html[data-fx="doodle"] #ground {
+  background:
+    repeating-linear-gradient(118deg, rgba(40, 120, 70, .2) 0 2px, transparent 2px 15px),
+    linear-gradient(var(--grass), var(--grass-dark));
+  filter: url(#dd-ground);
+}
+/* mép đường: nét mực đứt, độ dày không phụ thuộc kích thước màn hình */
+html[data-fx="doodle"] #ground .path path[fill="none"] { vector-effect: non-scaling-stroke; stroke-width: 2.4px; stroke-dasharray: 8 6; }
+html[data-fx="doodle"] .tuft svg { opacity: 1; }
+html[data-fx="doodle"] .flower { filter: url(#dd-flower) saturate(1.15); }
+html[data-fx="doodle"] .flower.gift { filter: url(#dd-flower) grayscale(1) contrast(1.15); }
+html[data-fx="doodle"] .flower.moving { filter: url(#dd-flower) drop-shadow(4px 8px 0 rgba(43, 43, 43, .35)); }
+html[data-fx="doodle"] .flower.moving.blocked { filter: url(#dd-flower) drop-shadow(0 0 8px #e0453a) saturate(.6); }
+html[data-fx="doodle"] .card-art svg { filter: url(#dd-flower); }
+html[data-fx="doodle"] .bee, html[data-fx="doodle"] .bf { filter: url(#dd-flower); }
+html[data-fx="doodle"] #bin .bin-svg, html[data-fx="doodle"] #net svg, html[data-fx="doodle"] #trash-can svg { filter: url(#dd-icon); }
+html[data-fx="doodle"] .fallen { border: 2px solid var(--dd-ink); box-shadow: 2px 2px 0 var(--dd-ink); background: #fff; }
+/* nút, hộp: viền mực, bóng cứng lệch như nhãn dán, hơi nghiêng so le */
+html[data-fx="doodle"] #toolbar button, html[data-fx="doodle"] #seed-toggle, html[data-fx="doodle"] #seed-form button, html[data-fx="doodle"] #mode-cancel,
+html[data-fx="doodle"] .card-actions button, html[data-fx="doodle"] #react-bar button, html[data-fx="doodle"] .edit-actions button,
+html[data-fx="doodle"] .date-field button, html[data-fx="doodle"] #zone-nav, html[data-fx="doodle"] #bin {
+  background: #fff; color: var(--dd-ink); border: 2px solid var(--dd-ink);
+  border-radius: 14px 18px 12px 17px / 17px 12px 18px 14px; box-shadow: var(--dd-shadow);
+}
+html[data-fx="doodle"] #toolbar button:nth-child(odd) { transform: rotate(-.8deg); }
+html[data-fx="doodle"] #toolbar button:nth-child(even) { transform: rotate(.7deg); }
+html[data-fx="doodle"] #toolbar button:hover, html[data-fx="doodle"] #seed-toggle:hover { background: #fff1a8; transform: translate(-1px, -1px) rotate(0); box-shadow: 4px 4px 0 var(--dd-ink); }
+html[data-fx="doodle"] #basket-count, html[data-fx="doodle"] #gifts-count, html[data-fx="doodle"] #lab-btn-count { background: var(--dd-ink); color: #fff; }
+html[data-fx="doodle"] #who { background: #fff; border: 2px solid var(--dd-ink); box-shadow: 2px 2px 0 var(--dd-ink); }
+html[data-fx="doodle"] #poem-panel, html[data-fx="doodle"] #basket-box, html[data-fx="doodle"] #log-box, html[data-fx="doodle"] #search-box,
+html[data-fx="doodle"] #help-box, html[data-fx="doodle"] #edit-box, html[data-fx="doodle"] #seedgift-box, html[data-fx="doodle"] #draw-box,
+html[data-fx="doodle"] #trash-box, html[data-fx="doodle"] #paper-box, html[data-fx="doodle"] #theme-box, html[data-fx="doodle"] #gift-box,
+html[data-fx="doodle"] .gate-card, html[data-fx="doodle"] .card, html[data-fx="doodle"] #note-box {
+  background: #fffef9; border: 2.5px solid var(--dd-ink);
+  border-radius: 20px 24px 18px 22px / 22px 18px 24px 20px; box-shadow: 6px 6px 0 var(--dd-ink);
+}
+html[data-fx="doodle"] #zone-previews .zp-card, html[data-fx="doodle"] .sr-item, html[data-fx="doodle"] .sg-item { border: 2px solid var(--dd-ink); background: #fff; box-shadow: 2px 2px 0 var(--dd-ink); }
+html[data-fx="doodle"] #help-body h3 { color: var(--dd-ink); border-bottom: 2px dashed var(--dd-ink); }
+html[data-fx="doodle"] #praise-pop span { border: 3px solid var(--dd-ink); color: var(--dd-ink); box-shadow: 6px 6px 0 var(--dd-ink); background: #fff1a8; }
+html[data-fx="doodle"] #lab-scene { border-color: var(--dd-ink); box-shadow: 8px 8px 0 var(--dd-ink); }
+html[data-fx="doodle"] .paper { filter: url(#dd-icon); box-shadow: 2px 3px 0 var(--dd-ink); }
+html[data-fx="doodle"] .theme-opt.on { border-color: var(--dd-ink); box-shadow: 3px 3px 0 var(--dd-ink); }

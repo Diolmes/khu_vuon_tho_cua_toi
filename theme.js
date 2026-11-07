@@ -27,6 +27,10 @@
       label: "Josefin Sans + Quicksand", head: "'Josefin Sans', system-ui, sans-serif", body: "'Quicksand', system-ui, sans-serif", rootSize: "100%",
       gf: "family=Josefin+Sans:wght@300;400;500&family=Quicksand:wght@400;500;600",
     },
+    doodle: {
+      label: "Shantell Sans + Patrick Hand (nét tay)", head: "'Shantell Sans', 'Patrick Hand', cursive", body: "'Patrick Hand', 'Shantell Sans', cursive", rootSize: "112%",
+      gf: "family=Shantell+Sans:wght@500;600&family=Patrick+Hand",
+    },
     spectral: {
       label: "Spectral + Lora", head: "'Spectral', Georgia, serif", body: "'Lora', Georgia, serif", rootSize: "100%",
       gf: "family=Spectral:ital,wght@0,300;0,400;0,500;1,400&family=Lora:ital,wght@0,400;0,500;1,400",
@@ -49,24 +53,41 @@
         path: "#e8d3a2", pathEdge: "#d4bb82", pathDots: "#c9b283",   // đường đi
         tufts: ["#8fb96a", "#7aa85a", "#a3c97c", "#6f9c52"],         // các cụm cỏ
       },
-      watercolor: false,                      // true: bật bộ lọc loang màu, nền giấy và icon vẽ tay màu nước
+      fx: "none",                             // "none" | "watercolor" | "doodle": hiệu ứng bộ lọc + bộ icon vẽ tay đi kèm
     },
     watercolor: {
       label: "Màu nước",
       note: "Loang màu trên giấy, hoa và đất nhòe mép, icon vẽ tay.",
       font: "garamond",
       vars: {
-        "--sky-top": "#cfe3f1", "--sky-bottom": "#fbf0e4",
-        "--grass": "#c6dbae", "--grass-dark": "#a6c690",
-        "--ink": "#4d4350", "--card": "#fffaf1", "--accent": "#e3a2b6",
+        "--sky-top": "#b9d9ef", "--sky-bottom": "#fbeedd",
+        "--grass": "#b4d49a", "--grass-dark": "#93bb7c",
+        "--ink": "#473c4d", "--card": "#fffaf1", "--accent": "#e08fa8",
         "--wc-line": "#c9a3b2", "--wc-shadow": "rgba(150, 110, 135, .24)",
       },
       tokens: {
-        stem: "#86ab8b",
-        path: "#efdcb8", pathEdge: "#d9bf92", pathDots: "#cdb48c",
-        tufts: ["#93c08f", "#7fae86", "#a9cf9a", "#74a67d"],
+        stem: "#6f9c78",
+        path: "#f0d9ae", pathEdge: "#d2b283", pathDots: "#c4a57a",
+        tufts: ["#7fb87f", "#6aa575", "#98c88a", "#5f9a6c"],
       },
-      watercolor: true,
+      fx: "watercolor",
+    },
+    doodle: {
+      label: "Doodle",
+      note: "Nét mực vẽ tay trên giấy vở, màu phẳng như bút màu.",
+      font: "doodle",
+      vars: {
+        "--sky-top": "#fffdf6", "--sky-bottom": "#fff4dc",
+        "--grass": "#a5e08e", "--grass-dark": "#7fcb78",
+        "--ink": "#2b2b2b", "--card": "#ffffff", "--accent": "#ff9fbc",
+        "--dd-ink": "#2b2b2b", "--dd-shadow": "3px 3px 0 #2b2b2b",
+      },
+      tokens: {
+        stem: "#3da35d",
+        path: "#fbe5ab", pathEdge: "#2b2b2b", pathDots: "#dfc07a",
+        tufts: ["#4fb868", "#3da35d", "#66c777", "#45ad62"],
+      },
+      fx: "doodle",
     },
   };
 
@@ -88,7 +109,8 @@
 
   const root = document.documentElement;
   root.dataset.theme = themeId;
-  root.dataset.wc = theme.watercolor ? "1" : "0";
+  root.dataset.fx = theme.fx;
+  root.dataset.wc = theme.fx === "watercolor" ? "1" : "0";
   Object.keys(theme.vars).forEach((k) => root.style.setProperty(k, theme.vars[k]));
   root.style.setProperty("--font-head", font.head);
   root.style.setProperty("--font-body", font.body);
@@ -106,7 +128,7 @@
   loadFonts([font.gf]);
 
   // ---------- Bộ lọc loang màu (chỉ khi theme màu nước) ----------
-  const FILTERS = `
+  const FILTERS_WC = `
   <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
       <!-- hoa: mép rung nhẹ, quầng màu loang quanh, hạt màu lốm đốm như giấy thấm -->
@@ -114,9 +136,9 @@
         <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="warp"/>
         <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="rough"/>
         <feGaussianBlur in="rough" stdDeviation="2.2" result="halo"/>
-        <feColorMatrix in="halo" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .4 0" result="haloSoft"/>
+        <feColorMatrix in="halo" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .26 0" result="haloSoft"/>
         <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="9" result="grain"/>
-        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 .62" result="grainA"/>
+        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .3 .82" result="grainA"/>
         <feComposite in="rough" in2="grainA" operator="in" result="pigment"/>
         <feMerge><feMergeNode in="haloSoft"/><feMergeNode in="pigment"/></feMerge>
       </filter>
@@ -126,13 +148,42 @@
         <feDisplacementMap in="SourceGraphic" in2="warp" scale="22" xChannelSelector="R" yChannelSelector="G" result="rough"/>
         <feGaussianBlur in="rough" stdDeviation="1.4" result="soft"/>
         <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" seed="7" result="grain"/>
-        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 .72" result="grainA"/>
+        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 .86" result="grainA"/>
         <feComposite in="soft" in2="grainA" operator="in"/>
       </filter>
       <!-- icon nhỏ: nét hơi rung như vẽ tay -->
       <filter id="wc-icon" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
         <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="5" result="warp"/>
         <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>`;
+
+  // Bộ lọc doodle: nét mực viền quanh hình, mép rung nhẹ như vẽ tay, màu phẳng.
+  const FILTERS_DD = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- hoa, mây, ong bướm: rung mép + viền mực bao quanh + nét mực ở chỗ đổi màu bên trong -->
+      <filter id="dd-flower" x="-14%" y="-10%" width="128%" height="122%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="11" result="w"/>
+        <feDisplacementMap in="SourceGraphic" in2="w" scale="3.4" xChannelSelector="R" yChannelSelector="G" result="s"/>
+        <feMorphology in="s" operator="dilate" radius="1.7" result="grow"/>
+        <feFlood flood-color="#2b2b2b" result="ink"/>
+        <feComposite in="ink" in2="grow" operator="in" result="outline"/>
+        <feMerge><feMergeNode in="outline"/><feMergeNode in="s"/></feMerge>
+      </filter>
+      <!-- đất + đường: mép đồi lượn lên xuống như nét bút, viền mực dày hơn -->
+      <filter id="dd-ground" x="-3%" y="-8%" width="106%" height="112%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="6" result="w"/>
+        <feDisplacementMap in="SourceGraphic" in2="w" scale="14" xChannelSelector="R" yChannelSelector="G" result="s"/>
+        <feMorphology in="s" operator="dilate" radius="2.2" result="grow"/>
+        <feFlood flood-color="#2b2b2b" result="ink"/>
+        <feComposite in="ink" in2="grow" operator="in" result="outline"/>
+        <feMerge><feMergeNode in="outline"/><feMergeNode in="s"/></feMerge>
+      </filter>
+      <filter id="dd-icon" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="5" result="warp"/>
+        <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
       </filter>
     </defs>
   </svg>`;
@@ -145,14 +196,31 @@
     lilac: "#b8a4e2", lilacD: "#7f68b8", brown: "#b58b68", brownD: "#7a5438",
     paper: "#fff6e6", grey: "#b3afc6", greyD: "#6e6a86",
   };
-  const sh = (d, fill, stroke, op = 0.74) => `<path d="${d}" fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-opacity=".6" stroke-width=".9" stroke-linejoin="round" stroke-linecap="round"/>`;
-  const ln = (d, stroke, w = 1.1) => `<path d="${d}" fill="none" stroke="${stroke}" stroke-opacity=".8" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const ci = (cx, cy, r, fill, stroke) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" fill-opacity=".74" stroke="${stroke || fill}" stroke-opacity=".6" stroke-width=".9"/>`;
-  const el = (cx, cy, rx, ry, fill, stroke, rot = 0) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" fill-opacity=".74" stroke="${stroke}" stroke-opacity=".6" stroke-width=".9" transform="rotate(${rot} ${cx} ${cy})"/>`;
-  const ring = (n, rx, ry, dist, fill, stroke) => Array.from({ length: n }, (_, i) => el(12, 12 - dist, rx, ry, fill, stroke, (360 / n) * i).replace(`rotate(${(360 / n) * i} 12 ${12 - dist})`, `rotate(${(360 / n) * i} 12 12)`)).join("");
   const svg = (inner) => `<svg viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
+  const ringOf = (el) => (n, rx, ry, dist, fill, stroke) => Array.from({ length: n }, (_, i) => el(12, 12 - dist, rx, ry, fill, stroke, (360 / n) * i)
+    .replace(`rotate(${(360 / n) * i} 12 ${12 - dist})`, `rotate(${(360 / n) * i} 12 12)`)).join("");
 
-  const ICONS = {
+  // Cọ màu nước: màu loang mờ, viền nhạt cùng tông
+  const wcPaint = (() => {
+    const sh = (d, fill, stroke, op = 0.74) => `<path d="${d}" fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-opacity=".6" stroke-width=".9" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const ln = (d, stroke, w = 1.1) => `<path d="${d}" fill="none" stroke="${stroke}" stroke-opacity=".8" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const ci = (cx, cy, r, fill, stroke) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" fill-opacity=".74" stroke="${stroke || fill}" stroke-opacity=".6" stroke-width=".9"/>`;
+    const el = (cx, cy, rx, ry, fill, stroke, rot = 0) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" fill-opacity=".74" stroke="${stroke}" stroke-opacity=".6" stroke-width=".9" transform="rotate(${rot} ${cx} ${cy})"/>`;
+    const rg = (cx, cy, r, fill, stroke, w = 1.6) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" fill-opacity=".3" stroke="${stroke}" stroke-opacity=".75" stroke-width="${w}"/>`;
+    return { sh, ln, ci, el, rg, ring: ringOf(el), svg };
+  })();
+  // Bút mực doodle: nét mực đen đậm, tô màu phẳng
+  const INK = "#2b2b2b";
+  const ddPaint = (() => {
+    const sh = (d, fill) => `<path d="${d}" fill="${fill}" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const ln = (d, stroke, w = 1.1) => `<path d="${d}" fill="none" stroke="${stroke === "#ffffff" ? "#ffffff" : INK}" stroke-width="${Math.max(1.2, w * 1.05)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const ci = (cx, cy, r, fill) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${INK}" stroke-width="1.4"/>`;
+    const el = (cx, cy, rx, ry, fill, stroke, rot = 0) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${INK}" stroke-width="1.4" transform="rotate(${rot} ${cx} ${cy})"/>`;
+    const rg = (cx, cy, r, fill, stroke, w = 1.6) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${INK}" stroke-width="${Math.max(1.6, w)}"/>`;
+    return { sh, ln, ci, el, rg, ring: ringOf(el), svg };
+  })();
+
+  const buildIcons = ({ sh, ln, ci, el, rg, ring, svg }) => ({
     "🎁": svg(sh("M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z", P.rose, P.roseD) + sh("M3 7.5h18V11H3z", P.coral, P.coralD) + sh("M10.6 7.5h2.8V21h-2.8z", P.butter, P.butterD) + sh("M12 7.5C9 3.5 5.5 5 7.5 7.5z", P.butter, P.butterD) + sh("M12 7.5C15 3.5 18.5 5 16.5 7.5z", P.butter, P.butterD)),
     "🗑": svg(sh("M6 8l1.2 12a1 1 0 0 0 1 .9h7.6a1 1 0 0 0 1-.9L18 8z", P.sage, P.sageD) + sh("M4.5 6h15v2h-15z", P.brown, P.brownD) + ln("M9.5 6V4.5h5V6", P.brownD) + ln("M10 11v6M14 11v6", P.sageD, .9)),
     "🌱": svg(ln("M12 21V11", P.sageD, 1.4) + sh("M12 12C6 12 4 8 4 5c4 0 8 1.5 8 7z", P.leaf, P.sageD) + sh("M12 14c0-5 3-8 8-8 0 5-3 8-8 8z", P.sage, P.sageD)),
@@ -171,21 +239,22 @@
     "🧺": svg(sh("M4 11h16l-1.8 8.2a1.6 1.6 0 0 1-1.6 1.3H7.4a1.6 1.6 0 0 1-1.6-1.3z", P.peach, P.brownD) + ln("M6 14.5h12M6.8 17.8h10.4M9 11.5l.8 8.7M15 11.5l-.8 8.7M12 11.5v8.7", P.brownD, .8) + ln("M6.5 11C6.5 4.5 17.5 4.5 17.5 11", P.brownD, 1.4)),
     "🙅": svg(ci(12, 6.2, 3, P.peach, P.peachD) + sh("M7 21c0-4.5 2.2-7.5 5-7.5s5 3 5 7.5z", P.rose, P.roseD) + ln("M8.5 11.5l7 5M15.5 11.5l-7 5", P.roseD, 1.6)),
     "↩": svg(ln("M9 7L4 12l5 5", P.greyD, 1.6) + ln("M4.5 12H15a4.5 4.5 0 0 1 0 9h-3", P.greyD, 1.6)),
-    "🚫": svg(`<circle cx="12" cy="12" r="8.4" fill="${P.coral}" fill-opacity=".28" stroke="${P.coralD}" stroke-opacity=".75" stroke-width="2"/>` + ln("M6.2 6.2l11.6 11.6", P.coralD, 2)),
+    "🚫": svg(rg(12, 12, 8.4, P.coral, P.coralD, 2) + ln("M6.2 6.2l11.6 11.6", P.coralD, 2)),
     "🌿": svg(ln("M6 21C8 15 11 11 18 4", P.sageD, 1.3) + sh("M9.5 15.5C5 15.5 4 12 4 9.5 8 9.5 9.5 12 9.5 15.5z", P.leaf, P.sageD) + sh("M12.5 11.5c0-4 2-6.5 6-7 .5 4-1.5 6.5-6 7z", P.sage, P.sageD) + sh("M14.2 15.5c3-1 5-.5 6.5 1.5-3 1.5-5.5 1-6.5-1.5z", P.leaf, P.sageD)),
     "🌼": svg(ring(8, 1.9, 3.6, 5.2, "#fff5d6", P.butterD) + ci(12, 12, 2.7, P.butter, P.butterD)),
     "📒": svg(sh("M6 3.5h12a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6z", P.butter, P.butterD) + sh("M4 3.5h3v17H4z", P.peach, P.peachD) + ci(5.5, 7, .9, P.brownD) + ci(5.5, 12, .9, P.brownD) + ci(5.5, 17, .9, P.brownD) + ln("M10 8.5h6M10 11.5h6M10 14.5h4", P.brownD, .9)),
-    "🔍": svg(`<circle cx="10.5" cy="10.5" r="6" fill="#dcecf8" fill-opacity=".7" stroke="${P.skyD}" stroke-opacity=".75" stroke-width="1.6"/>` + ln("M15 15l5.5 5.5", P.brownD, 2.2) + ln("M7.5 9.5a3.5 3.5 0 0 1 2.5-2.5", "#ffffff", 1.2)),
+    "🔍": svg(rg(10.5, 10.5, 6, "#dcecf8", P.skyD, 1.6) + ln("M15 15l5.5 5.5", P.brownD, 2.2) + ln("M7.5 9.5a3.5 3.5 0 0 1 2.5-2.5", "#ffffff", 1.2)),
     "🏚": svg(sh("M5 11h14v9H5z", P.peach, P.peachD) + sh("M3 11.5l9-7.5 9 7.5z", P.brown, P.brownD) + sh("M10.5 14.5h3V20h-3z", P.brown, P.brownD) + sh("M6.5 13h2.5v2.5H6.5z", P.sky, P.skyD)),
     "📤": svg(sh("M3.5 14v5a1 1 0 0 0 1 1h15a1 1 0 0 0 1-1v-5h-4.5l-1.5 2.5h-5L8 14z", P.sage, P.sageD) + ln("M12 12.5V3.5M8.5 7L12 3.5 15.5 7", P.roseD, 1.6)),
     "📥": svg(sh("M3.5 14v5a1 1 0 0 0 1 1h15a1 1 0 0 0 1-1v-5h-4.5l-1.5 2.5h-5L8 14z", P.sage, P.sageD) + ln("M12 3.5v9M8.5 9L12 12.5 15.5 9", P.skyD, 1.6)),
     "🚪": svg(sh("M6 3.5h12v17H6z", P.brown, P.brownD) + ln("M8.5 6.5h7v5h-7zM8.5 13h7v5h-7z", P.brownD, .8) + ci(15.5, 12.5, 1, P.butter, P.butterD)),
     "📷": svg(sh("M3.5 8h3.5l1.5-2.5h7L17 8h3.5a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-17a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z", P.grey, P.greyD) + ci(12, 13, 3.8, P.sky, P.skyD) + ci(12, 13, 1.5, "#ffffff", P.skyD)),
-    "🔬": svg(`<rect x="9.5" y="3" width="4.6" height="11" rx="1.5" transform="rotate(25 12 9)" fill="${P.sky}" fill-opacity=".74" stroke="${P.skyD}" stroke-opacity=".6" stroke-width=".9"/>` + ln("M16.5 9a6 6 0 0 1-3.5 9", P.greyD, 1.5) + ln("M5 20.5h14", P.brownD, 1.8) + ln("M8 17.5h4", P.brownD, 1.4)),
+    "🔬": svg(el(12, 8.5, 2.5, 6, P.sky, P.skyD, 25) + ln("M16.5 9a6 6 0 0 1-3.5 9", P.greyD, 1.5) + ln("M5 20.5h14", P.brownD, 1.8) + ln("M8 17.5h4", P.brownD, 1.4)),
     "🗓": svg(sh("M4 6h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", P.paper, P.roseD) + sh("M3 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v3H3z", P.rose, P.roseD) + ln("M8 3.5V7M16 3.5V7", P.roseD, 1.4) + ci(8, 14, .9, P.roseD) + ci(12, 14, .9, P.roseD) + ci(16, 14, .9, P.roseD) + ci(8, 17.4, .9, P.roseD) + ci(12, 17.4, .9, P.roseD)),
-    "😇": svg(ci(12, 13.5, 7, P.butter, P.butterD) + `<ellipse cx="12" cy="5" rx="4.5" ry="1.6" fill="none" stroke="${P.butterD}" stroke-opacity=".85" stroke-width="1.4"/>` + ln("M9.5 13h.01M14.5 13h.01", P.brownD, 1.8) + ln("M9.5 16c1.5 1.5 3.5 1.5 5 0", P.brownD, 1)),
+    "😇": svg(ci(12, 13.5, 7, P.butter, P.butterD) + ln("M7.5 5a4.5 1.6 0 1 0 9 0 4.5 1.6 0 1 0 -9 0", P.butterD, 1.4) + ln("M9.5 13h.01M14.5 13h.01", P.brownD, 1.8) + ln("M9.5 16c1.5 1.5 3.5 1.5 5 0", P.brownD, 1)),
     "🧽": svg(sh("M4.5 8.5h15a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z", P.butter, P.butterD) + sh("M4.5 8.5L6 6h13l1.5 2.5z", "#fbe9a8", P.butterD) + ci(8, 12, .9, P.peachD) + ci(13, 13.5, 1.1, P.peachD) + ci(17, 11.5, .8, P.peachD)),
-  };
+  });
+  const ICONS = buildIcons(theme.fx === "doodle" ? ddPaint : wcPaint);
 
   // ---------- Thay emoji bằng icon (chỉ khi theme màu nước) ----------
   function iconizer() {
@@ -220,8 +289,8 @@
   }
 
   function mount() {
-    if (theme.watercolor) {
-      document.body.insertAdjacentHTML("afterbegin", FILTERS);
+    if (theme.fx !== "none") {
+      document.body.insertAdjacentHTML("afterbegin", theme.fx === "doodle" ? FILTERS_DD : FILTERS_WC);
       const it = iconizer();
       it.walk(document.body);
       new MutationObserver((muts) => {
