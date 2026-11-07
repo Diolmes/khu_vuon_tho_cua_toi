@@ -425,7 +425,7 @@ function renderFlower(p, animate) {
 }
 
 // Hoa co giãn theo cỡ màn hình: điện thoại nhỏ hơn, màn hình lớn to hơn
-const flowerScale = () => clamp(Math.min(window.innerWidth, window.innerHeight * 1.4) / 1100, 0.6, 1.25);
+const flowerScale = () => clamp(Math.min(window.innerWidth, window.innerHeight * 1.4) / 1100, 0.5, 1.25) * 0.8;   // 0.8: hoa nhỏ hơn cho vườn thoáng, chứa được nhiều hoa hơn
 
 // Hoa ở xa (y nhỏ) thì bé hơn, hoa ở gần thì to hơn
 function placeFlower(el, p) {
