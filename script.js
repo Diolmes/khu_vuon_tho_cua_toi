@@ -1412,7 +1412,7 @@ async function fertilize(id) {
   touchPoem(id);
   const pt = headPoint(id);
   if (pt) { puff(pt, "🌿"); puff(pt, "✨"); }
-  toast("Bông hoa đã đứng thẳng lại 🌼");
+  toast("Bông hoa đã tươi trở lại 🌼");
 }
 
 // ---------- Ong + thụ phấn ----------
@@ -3049,8 +3049,98 @@ dc.addEventListener("pointermove", (e) => { if (!drawing) return; const p = dpos
 $("draw-undo").addEventListener("click", () => { const im = undoStack.pop(); if (im) dctx.putImageData(im, 0, 0); });
 $("draw-clear").addEventListener("click", () => { pushUndo(); dctx.clearRect(0, 0, dc.width, dc.height); });
 
+// ----- Tách nhân vật từ ảnh tải lên: bỏ nền đơn sắc ở rìa ảnh, phần còn lại thành nhân vật để chỉnh tiếp bằng tẩy / bút -----
+let photoSrc = null;        // ảnh gốc đã vừa khung vẽ (ImageData)
+function loadImageFile(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); res(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("img")); };
+    im.src = url;
+  });
+}
+// Màu nền = màu trung vị của các điểm ở rìa ảnh. Từ rìa loang vào trong, xóa mọi điểm có màu gần màu nền
+// (trong ngưỡng `tol`); chỉ giữ mảng lớn nhất của phần còn lại, làm mềm viền một điểm ảnh.
+function cutBackground(src, tol) {
+  const w = src.width, h = src.height, d = src.data;
+  const out = new ImageData(new Uint8ClampedArray(d), w, h), o = out.data;
+  const at = (x, y) => (y * w + x) * 4;
+  const rs = [], gs = [], bs = [];
+  const edge = (x, y) => { const i = at(x, y); if (d[i + 3] > 200) { rs.push(d[i]); gs.push(d[i + 1]); bs.push(d[i + 2]); } };
+  for (let x = 0; x < w; x++) { edge(x, 0); edge(x, h - 1); }
+  for (let y = 1; y < h - 1; y++) { edge(0, y); edge(w - 1, y); }
+  const med = (a) => (a.length ? a.sort((p, q) => p - q)[a.length >> 1] : 0);
+  const ref = rs.length ? [med(rs), med(gs), med(bs)] : null;
+  const isBg = (i) => d[i + 3] < 20 || (ref && Math.hypot(d[i] - ref[0], d[i + 1] - ref[1], d[i + 2] - ref[2]) <= tol);
+  const gone = new Uint8Array(w * h), q = new Int32Array(w * h);
+  let qh = 0, qt = 0;
+  const seed = (x, y) => { const p = y * w + x; if (!gone[p] && isBg(p * 4)) { gone[p] = 1; q[qt++] = p; } };
+  for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+  for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+  while (qh < qt) {
+    const p = q[qh++], x = p % w, y = (p / w) | 0;
+    if (x > 0) seed(x - 1, y);
+    if (x < w - 1) seed(x + 1, y);
+    if (y > 0) seed(x, y - 1);
+    if (y < h - 1) seed(x, y + 1);
+  }
+  // giữ mảng lớn nhất (và mảng nào ≥ 25% mảng lớn nhất): bỏ đốm lẻ
+  const label = new Int32Array(w * h), sizes = [0];
+  for (let s = 0; s < w * h; s++) {
+    if (gone[s] || label[s]) continue;
+    const id = sizes.length;
+    let n = 0; qh = 0; qt = 0; q[qt++] = s; label[s] = id;
+    while (qh < qt) {
+      const p = q[qh++], x = p % w, y = (p / w) | 0; n++;
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const np = ny * w + nx;
+        if (!gone[np] && !label[np]) { label[np] = id; q[qt++] = np; }
+      }
+    }
+    sizes.push(n);
+  }
+  const big = Math.max(0, ...sizes);
+  for (let p = 0; p < w * h; p++) { if (!gone[p] && sizes[label[p]] < big * 0.25) gone[p] = 1; }
+  for (let p = 0; p < w * h; p++) {
+    const i = p * 4;
+    if (gone[p]) { o[i + 3] = 0; continue; }
+    const x = p % w, y = (p / w) | 0;
+    const nearGone = (x > 0 && gone[p - 1]) || (x < w - 1 && gone[p + 1]) || (y > 0 && gone[p - w]) || (y < h - 1 && gone[p + w]);
+    if (nearGone) o[i + 3] = Math.round(o[i + 3] * 0.55);
+  }
+  return out;
+}
+function applyCutout() {
+  if (!photoSrc) return;
+  dctx.clearRect(0, 0, dc.width, dc.height);
+  dctx.putImageData(cutBackground(photoSrc, +$("photo-tol").value), 0, 0);
+}
+let photoTimer = null;
+$("photo-tol").addEventListener("input", () => { clearTimeout(photoTimer); photoTimer = setTimeout(applyCutout, 50); });
+$("photo-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const im = await loadImageFile(file);
+    const W = dc.width, H = dc.height, k = Math.min(W / im.width, H / im.height);
+    const tmp = document.createElement("canvas");
+    tmp.width = W; tmp.height = H;
+    const g = tmp.getContext("2d", { willReadFrequently: true });
+    g.drawImage(im, (W - im.width * k) / 2, (H - im.height * k) / 2, im.width * k, im.height * k);
+    photoSrc = g.getImageData(0, 0, W, H);
+    pushUndo();
+    $("photo-tune").hidden = false;
+    applyCutout();
+    toast("Đã tách nhân vật. Còn sót nền thì kéo thanh \"Độ tách nền\" hoặc dùng cục tẩy 🧽");
+  } catch { toast("Không đọc được ảnh này, bạn thử ảnh khác nhé."); }
+});
+
 function openDraw() {
   undoStack.length = 0;
+  photoSrc = null;
+  $("photo-tune").hidden = true;
   dctx.clearRect(0, 0, dc.width, dc.height);
   const a = myAvatar();
   if (a) { const im = new Image(); im.onload = () => dctx.drawImage(im, 0, 0, dc.width, dc.height); im.src = a; }   // vẽ lại từ nhân vật cũ
