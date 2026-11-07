@@ -548,8 +548,10 @@ seedToggle.addEventListener("click", () => {
 
 // Gieo một hạt: tạo bài thơ rồi cho hạt rơi xuống, hoa nở. extra = { gift: true, from } cho hạt được tặng.
 function sowSeed(text, extra = {}) {
-  if (curZone !== newestZone()) goNewest();            // hoa mới chưa có ngày viết nên mọc ở khu mới nhất: đưa người gieo tới đó
-  const spot = findSpot(newestZone());                 // chỗ thoáng, không trên đường đi, không đè lên hoa khác
+  // hoa mới chưa có ngày viết thì mọc ở khu mới nhất; có ngày viết (hạt khách tặng) thì mọc ở khu của năm đó
+  const zone = yearOf(extra.written) ? Math.max(MIN_ZONE, yearOf(extra.written)) : newestZone();
+  if (curZone !== zone) switchZone(zone);              // đưa người gieo tới đúng khu để thấy hạt rơi
+  const spot = findSpot(zone);                         // chỗ thoáng, không trên đường đi, không đè lên hoa khác
   const p = {
     id: newId(),
     texts: [text],
@@ -558,7 +560,7 @@ function sowSeed(text, extra = {}) {
     parents: null,
     x: spot.x,
     y: spot.y,
-    zone: newestZone(),
+    zone,
     status: "garden",
     missing: [],
     t: Date.now(),
@@ -1958,7 +1960,10 @@ function closeSeedGifts() { $("seedgift-overlay").hidden = true; }
 function sowGift(g) {
   if (!isOwner() || !g.text) return;
   closeSeedGifts();
-  sowSeed(g.text, { gift: true, from: g.from || "" })
+  // hạt khách tặng tự điền ngày viết = ngày khách bấm tặng
+  const sent = new Date(g.t || Date.now());
+  const written = `${sent.getFullYear()}-${pad2(sent.getMonth() + 1)}-${pad2(sent.getDate())}`;
+  sowSeed(g.text, { gift: true, from: g.from || "", written })
     .then(() => db.ref("gifts/" + g.id).remove())
     .catch(() => toast("Chưa gieo được hạt này, hạt vẫn còn trong hộp."));
   toast(`Đã gieo hạt giống của ${g.from || "một người bạn"} 🌱`);
