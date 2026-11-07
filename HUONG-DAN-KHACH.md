@@ -50,7 +50,7 @@ Khi hoa rụng chữ, bạn có thể giúp bằng cách nhặt chữ:
 Bạn có thể hái một bông hoa bỏ vào giỏ và trồng lại ở chỗ khác. Bấm vào bông hoa trong giỏ để đọc thơ.
 
 ### Vẽ nhân vật 🎨
-Bấm **🎨 Nhân vật** (hoặc nút vẽ ở màn hình vào vườn) để vẽ nhân vật của bạn bằng bút marker. Có bánh xe màu, thanh chỉnh sáng/tối và cỡ nét, có tẩy và hoàn tác. Xong rồi, nhân vật sẽ đi dạo trong vườn theo con trỏ của bạn (chỉ đi trên phần đất), tên bạn nằm dưới chân. Mọi người trong vườn sẽ thấy nhân vật của nhau. Không thích thì bấm "Không dùng nhân vật".
+Bấm **🎨 Nhân vật** (hoặc nút vẽ ở màn hình vào vườn) để vẽ nhân vật của bạn bằng bút marker. Có bánh xe màu, thanh chỉnh sáng/tối và cỡ nét, có tẩy và hoàn tác. Xong rồi, nhân vật sẽ đi dạo trong vườn theo con trỏ của bạn (chỉ đi trên phần đất), tên bạn nằm dưới chân. Mọi người trong vườn sẽ thấy nhân vật của nhau. Lười vẽ thì bấm **📷 Tách nhân vật từ ảnh**, chọn một tấm ảnh (nền trơn như tường hay giấy trắng là tách đẹp nhất), web tự bỏ nền giữ lại nhân vật; kéo thanh "Độ tách nền" hoặc dùng cục tẩy để dọn chỗ còn sót. Không thích thì bấm "Không dùng nhân vật".
 
 ### Hóa thân thành chủ vườn 🎭
 Bấm **🎭 Hóa thân chủ vườn** để thử làm chủ vườn: gieo hạt, sửa thơ, dời hoa, gọi ong…

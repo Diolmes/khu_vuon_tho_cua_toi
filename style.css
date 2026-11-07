@@ -1321,3 +1321,16 @@ body.locked #zone-nav { visibility: hidden; }
 .md-table th { background: #fff3d6; font-weight: normal; }
 
 body.dragging-flower, body.dragging-flower * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
+
+/* ---------- Tách nhân vật từ ảnh ---------- */
+.photo-row { display: flex; flex-direction: column; gap: 6px; }
+.photo-btn {
+  display: inline-block; align-self: flex-start; cursor: pointer; font-size: .85rem;
+  background: var(--card); color: var(--ink); border: 2px dashed var(--accent); border-radius: 999px; padding: 4px 12px;
+}
+.photo-btn:hover { background: #ffeef2; }
+#photo-tune { display: flex; flex-direction: column; gap: 2px; }
+#photo-tune[hidden] { display: none; }
+#photo-tune label { display: flex; flex-direction: column; gap: 2px; font-size: .78rem; opacity: .85; }
+#photo-tune input[type=range] { width: 100%; }
+.photo-hint { font-size: .72rem; opacity: .6; font-style: italic; }
