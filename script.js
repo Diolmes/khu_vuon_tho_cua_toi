@@ -2853,6 +2853,10 @@ function setPeer(uid, d) {
     if (peers[uid]) removePeer(uid);
     return;
   }
+  if (uid !== ME.uid && Date.now() - (d.t || 0) > 180000) {   // tín hiệu cuối cách đây >3 phút: người đó đã đi rồi (bóng ma còn sót trong dữ liệu)
+    if (peers[uid]) removePeer(uid);
+    return;
+  }
   peers[uid] = d;
   seenAt[uid] = Date.now();                               // lần cuối nhận được tín hiệu từ người này
   updateWho();
