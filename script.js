@@ -2532,11 +2532,8 @@ function renderReactions(obj) {
 function watchReactions(id) {
   stopReactions();
   $("react-log").hidden = true;
-  // chủ vườn thấy cả khen lẫn chê; khách chỉ thấy ai đã khen (đường dẫn praises/ công khai, chê thì không)
-  const owner = isOwner();
-  $("react-title").textContent = owner ? "📖 Ai đã khen / chê" : "🌸 Ai đã khen hoa này";
-  $("react-empty").textContent = owner ? "Chưa ai khen hay chê bông hoa này." : "Chưa ai khen bông hoa này. Bạn khen đầu tiên nhé!";
-  reactQuery = db.ref((owner ? "reactions/" : "praises/") + id).limitToLast(40);
+  // ai cũng xem được ai đã khen / chê bông hoa này
+  reactQuery = db.ref("reactions/" + id).limitToLast(40);
   reactCb = reactQuery.on("value", (s) => renderReactions(s.val()));
 }
 // các nút/chữ phụ trong bảng thơ tùy vai trò
@@ -2550,7 +2547,6 @@ function react(kind) {
   if (!p || isOwner() || Date.now() < reactBusyUntil) return;
   reactBusyUntil = Date.now() + 6000;
   db.ref("reactions/" + p.id).push().set({ name: ME.name, uid: ME.uid, kind, t: SV.TIMESTAMP }).catch(() => {});
-  if (kind === "praise") db.ref("praises/" + p.id).push().set({ name: ME.name, uid: ME.uid, t: SV.TIMESTAMP }).catch(() => {});
   if (kind === "praise") {
     // lời khen hiện giữa màn hình cho dễ đọc, xong mới đóng bảng thơ và gọi đàn bướm
     const pop = $("praise-pop");

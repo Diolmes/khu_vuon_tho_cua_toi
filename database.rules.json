@@ -75,21 +75,8 @@
         }
       }
     },
-    "praises": {
-      ".read": "auth != null",
-      "$poem": {
-        "$id": {
-          ".write": "auth != null && (auth.token.email == 'chu-vuon@khuvuontho.app' || (!data.exists() && newData.child('uid').val() == auth.uid))",
-          ".validate": "newData.hasChildren(['name','uid','t']) && newData.child('name').isString() && newData.child('name').val().length <= 40",
-          "name": { ".validate": true },
-          "uid": { ".validate": true },
-          "t": { ".validate": true },
-          "$other": { ".validate": false }
-        }
-      }
-    },
     "reactions": {
-      ".read": "auth != null && auth.token.email == 'chu-vuon@khuvuontho.app'",
+      ".read": "auth != null",
       "$poem": {
         "$id": {
           ".write": "auth != null && (auth.token.email == 'chu-vuon@khuvuontho.app' || (!data.exists() && newData.child('uid').val() == auth.uid))",
