@@ -17,7 +17,7 @@ Khu vườn này có nhiều khu: mỗi khu là một năm, từ năm 2022 đế
 
 ### Khen hoa hoặc chê hoa
 Ở cuối bài thơ có hai nút:
-- **🌸 Khen hoa**: tốt tốt tốt. một đàn bướm sẽ bay tới đậu lên bông hoa bạn khen.
+- **🌸 Khen hoa**: tốt tốt tốt. một đàn bướm sẽ bay tới đậu lên bông hoa bạn khen. Ở cuối bài thơ có danh sách **ai đã khen** bông hoa đó (lời chê thì chỉ chủ vườn thấy).
 - **🙅 Chê hoa**: chất đấy. bạn sẽ nhận được một lời nhắn từ chủ vườn.
 
 ### Tặng hạt giống cho chủ vườn 🎁

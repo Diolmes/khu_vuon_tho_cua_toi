@@ -1518,7 +1518,7 @@ let lastT = performance.now();
   requestAnimationFrame(loop);
 })(lastT);
 
-const alive = (id) => { const p = getPoem(id); return !!p && p.status === "garden" && !p.hybrid && !p.gift; };
+const alive = (id) => { const p = getPoem(id); return !!p && p.status === "garden" && !p.hybrid; };
 const dayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
 
 async function visit(bee, id) {
@@ -1530,9 +1530,9 @@ async function visit(bee, id) {
   return true;
 }
 
-// chỉ hoa thường mới được làm bố mẹ, và mỗi cặp chỉ có một hoa con
+// hoa thường và hoa khách tặng đều làm bố mẹ được (hoa lai không), và mỗi cặp chỉ có một hoa con
 function pickPair() {
-  const parents = state.poems.filter((p) => p.status === "garden" && p.zone === curZone && !p.hybrid && !p.gift);
+  const parents = state.poems.filter((p) => p.status === "garden" && p.zone === curZone && !p.hybrid);
   const pairs = [];
   for (let i = 0; i < parents.length; i++) {
     for (let j = i + 1; j < parents.length; j++) {
@@ -1588,7 +1588,8 @@ function spawnChild(mom, dad) {
   toast("Ong vừa thụ phấn: một chùm thơ lai hai bài đã nở 🌸");
 }
 
-// Ong chỉ đi thụ phấn 1 lần mỗi ngày (cả vườn dùng chung một lượt)
+// Ong đi thụ phấn tối đa 3 lần mỗi ngày (cả vườn dùng chung 3 lượt, kể cả lượt tự động)
+const BEE_PER_DAY = 3;
 let beeSeen = null;
 async function claimPollination(manual) {
   if (manual && !isOwner()) return;                    // khách không được gọi ong
@@ -1602,11 +1603,12 @@ async function claimPollination(manual) {
   const myId = newId();
   beeSeen = myId;      // đánh dấu trước để máy này không tự chạy lại như người ngoài
   const res = await db.ref("garden/bee").transaction((cur) => {
-    if (cur && cur.lastDay === today) return undefined;
-    return { lastDay: today, mom: pair[0].id, dad: pair[1].id, at: Date.now(), id: myId, by: ME.uid };
+    const n = cur && cur.lastDay === today ? (cur.count || 1) : 0;
+    if (n >= BEE_PER_DAY) return undefined;
+    return { lastDay: today, count: n + 1, mom: pair[0].id, dad: pair[1].id, at: Date.now(), id: myId, by: ME.uid };
   });
   if (!res.committed) {
-    if (manual) toast("Hôm nay ong đã đi thụ phấn rồi, mai nhé 🐝");
+    if (manual) toast("Hôm nay ong đã đi thụ phấn đủ 3 lần rồi, mai nhé 🐝");
     return false;
   }
   runPollination(pair[0].id, pair[1].id, true);
@@ -2522,15 +2524,19 @@ function renderReactions(obj) {
   $("react-empty").hidden = rows.length > 0;
   rows.forEach((r) => {
     const li = document.createElement("li");
-    li.textContent = `${r.kind === "praise" ? "🌸" : "🙅"} ${r.name || "?"} ${r.kind === "praise" ? "khen" : "chê"}${r.t ? " · " + fmtTime(r.t) : ""}`;
+    const isPraise = !r.kind || r.kind === "praise";
+    li.textContent = `${isPraise ? "🌸" : "🙅"} ${r.name || "?"} ${isPraise ? "khen" : "chê"}${r.t ? " · " + fmtTime(r.t) : ""}`;
     ul.appendChild(li);
   });
 }
 function watchReactions(id) {
   stopReactions();
   $("react-log").hidden = true;
-  if (!isOwner()) return;
-  reactQuery = db.ref("reactions/" + id).limitToLast(40);
+  // chủ vườn thấy cả khen lẫn chê; khách chỉ thấy ai đã khen (đường dẫn praises/ công khai, chê thì không)
+  const owner = isOwner();
+  $("react-title").textContent = owner ? "📖 Ai đã khen / chê" : "🌸 Ai đã khen hoa này";
+  $("react-empty").textContent = owner ? "Chưa ai khen hay chê bông hoa này." : "Chưa ai khen bông hoa này. Bạn khen đầu tiên nhé!";
+  reactQuery = db.ref((owner ? "reactions/" : "praises/") + id).limitToLast(40);
   reactCb = reactQuery.on("value", (s) => renderReactions(s.val()));
 }
 // các nút/chữ phụ trong bảng thơ tùy vai trò
@@ -2544,6 +2550,7 @@ function react(kind) {
   if (!p || isOwner() || Date.now() < reactBusyUntil) return;
   reactBusyUntil = Date.now() + 6000;
   db.ref("reactions/" + p.id).push().set({ name: ME.name, uid: ME.uid, kind, t: SV.TIMESTAMP }).catch(() => {});
+  if (kind === "praise") db.ref("praises/" + p.id).push().set({ name: ME.name, uid: ME.uid, t: SV.TIMESTAMP }).catch(() => {});
   if (kind === "praise") {
     // lời khen hiện giữa màn hình cho dễ đọc, xong mới đóng bảng thơ và gọi đàn bướm
     const pop = $("praise-pop");

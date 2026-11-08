@@ -81,7 +81,7 @@ Mỗi thứ có hai cách chạy: **tự động mỗi ngày** vào giờ ngẫu
 | | Tự động | Gọi bằng nút |
 |---|---|---|
 | ☔ Mưa | Mỗi ngày một cơn vào một giờ ngẫu nhiên trong 8h–22h | Gọi tùy ý, tối đa **3 lần trong 1 phút**, không giới hạn số cơn trong ngày. Đang mưa mà bấm thì chỉ nhắc "Đang mưa rồi nè", không tính vào 3 lần |
-| 🐝 Ong | Mỗi ngày một lượt vào một giờ ngẫu nhiên trong 8h–22h | **Mỗi ngày một lượt** (cả vườn dùng chung). Chỉ chủ vườn gọi được |
+| 🐝 Ong | Mỗi ngày một lượt vào một giờ ngẫu nhiên trong 8h–22h | **Tối đa 3 lượt mỗi ngày** (cả vườn dùng chung, tính cả lượt tự động). Chỉ chủ vườn gọi được. Ong lai được cả hoa thường lẫn hoa khách tặng (đen trắng) |
 | 🦋 Bướm | Mỗi ngày một lượt vào một giờ ngẫu nhiên trong 8h–22h | Gọi tùy ý (cả khách cũng gọi được). Tối đa **3 con trong vườn cùng lúc**. Bấm quá **5 lần trong 1 phút** thì báo "Bướm bay nhiều cũng biết mệt chứ bồ" |
 
 Giờ tự động của mỗi ngày được chọn một lần và dùng chung cho cả vườn, nên không bị lặp bởi nhiều người cùng mở web.
