@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Khu vườn thơ của tôi</title>
-  <link rel="stylesheet" href="style.css?v=32">
+  <link rel="stylesheet" href="style.css?v=33">
   <link rel="stylesheet" href="theme.css?v=4">
   <script src="theme.js?v=4"></script>
 </head>
@@ -303,8 +303,14 @@
     <div id="log-box">
       <button id="log-close" type="button" aria-label="Đóng">×</button>
       <h2>Nhật ký vườn</h2>
+      <div id="log-tabs">
+        <button type="button" id="log-tab-visits" class="on">🚪 Ra vào</button>
+        <button type="button" id="log-tab-react">🌸 Khen chê</button>
+      </div>
       <p id="log-empty">Chưa có ai ghé vườn.</p>
       <div id="log-table-wrap"><table id="log-table"><thead><tr><th>Ai</th><th>Vào lúc</th><th>Rời lúc</th></tr></thead><tbody></tbody></table></div>
+      <p id="react-hist-empty" hidden>Chưa có ai khen hay chê hoa.</p>
+      <ul id="react-hist" hidden></ul>
     </div>
   </div>
 
@@ -379,6 +385,6 @@
 
   <script src="firebase-config.js?v=29"></script>
   <script src="backend.js?v=29"></script>
-  <script src="script.js?v=34"></script>
+  <script src="script.js?v=35"></script>
 </body>
 </html>

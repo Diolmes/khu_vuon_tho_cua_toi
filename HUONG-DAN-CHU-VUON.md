@@ -146,7 +146,7 @@ Bấm **🏚️ Lán** để vào lán nghiên cứu, nơi bạn cất những h
 | ☔ | Gọi mưa |
 | 🐝 | Gọi ong |
 | 🦋 | Gọi bướm |
-| 📖 Nhật ký | Ai đã vào vườn lúc nào, rời lúc nào |
+| 📖 Nhật ký | Hai tab: **🚪 Ra vào** (ai vào vườn lúc nào, rời lúc nào, kèm hình nhân vật của khách) và **🌸 Khen chê** (ai đã khen hay chê hoa nào; bấm **[tới hoa]** để mở thẳng bài thơ đó) |
 | 📤 Sao lưu | Tải cả vườn về thành file `.json` |
 | 📥 Nhập | Nhập vườn từ file sao lưu, hoặc vườn cũ còn trong trình duyệt |
 | ✨ Giao diện | Đổi phong cách và bộ chữ (xem bên dưới) |

@@ -2935,7 +2935,10 @@ function refreshAvatarPreview() {
 function setMyAvatar(a) {
   try { a ? localStorage.setItem(AVATAR_KEY, a) : localStorage.removeItem(AVATAR_KEY); } catch {}
   refreshAvatarPreview();
-  if (ME && entered) (realDb || db).ref("presence/" + ME.uid).update({ avatar: a || null });
+  if (ME && entered) {
+    (realDb || db).ref("presence/" + ME.uid).update({ avatar: a || null });
+    try { visitRef?.update({ avatar: a || null }); } catch {}
+  }
 }
 
 // Nhân vật đi bộ trong vườn theo con trỏ của chủ nhân (chỉ đi trên phần đất)
@@ -3209,7 +3212,8 @@ refreshAvatarPreview();
 let visitRef = null;
 function logVisit() {
   visitRef = db.ref("visits").push();
-  visitRef.set({ uid: ME.uid, name: ME.name, role: ROLE, at: SV.TIMESTAMP });
+  const av = isOwner() ? "" : myAvatar();       // lưu kèm hình nhân vật để chủ vườn nhận ra khách trong nhật ký
+  visitRef.set({ uid: ME.uid, name: ME.name, role: ROLE, at: SV.TIMESTAMP, ...(av ? { avatar: av } : {}) });
   visitRef.onDisconnect().update({ leftAt: SV.TIMESTAMP });
 }
 const fmtTime = (ts) => new Date(ts).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -3224,7 +3228,8 @@ function renderLog(obj) {
   rows.forEach((r) => {
     const tr = document.createElement("tr");
     const who = document.createElement("td");
-    who.textContent = r.name || "?";
+    if (validAvatar(r.avatar)) { const im = document.createElement("img"); im.className = "log-av"; im.src = r.avatar; im.alt = ""; who.appendChild(im); }
+    who.append(r.name || "?");
     const tag = document.createElement("span");
     tag.className = "role-tag";
     tag.textContent = r.role === "owner" ? "chủ vườn" : "khách";
@@ -3239,14 +3244,56 @@ function renderLog(obj) {
     tb.appendChild(tr);
   });
 }
+// lịch sử khen/chê: ai khen hay chê hoa nào, bấm [tới hoa] để mở thẳng bài thơ
+let reactHistRef = null, reactHistCb = null;
+function setLogTab(which) {
+  const react = which === "react";
+  $("log-tab-visits").classList.toggle("on", !react);
+  $("log-tab-react").classList.toggle("on", react);
+  if (react) { $("log-empty").hidden = true; $("log-table-wrap").hidden = true; }
+  else { $("react-hist").hidden = true; $("react-hist-empty").hidden = true; if (logQuery) logQuery.once("value").then((s) => renderLog(s.val())); }
+  if (react) {
+    if (reactHistRef) { try { reactHistRef.off("value", reactHistCb); } catch {} }
+    reactHistRef = db.ref("reactions");
+    reactHistCb = reactHistRef.on("value", (s) => renderReactHist(s.val()));
+  } else if (reactHistRef) { try { reactHistRef.off("value", reactHistCb); } catch {} reactHistRef = null; }
+}
+function renderReactHist(obj) {
+  const rows = [];
+  Object.keys(obj || {}).forEach((pid) => Object.keys(obj[pid] || {}).forEach((k) => rows.push({ pid, ...obj[pid][k] })));
+  rows.sort((a, b) => (b.t || 0) - (a.t || 0));
+  const ul = $("react-hist");
+  ul.innerHTML = "";
+  ul.hidden = rows.length === 0;
+  $("react-hist-empty").hidden = rows.length > 0;
+  rows.slice(0, 200).forEach((r) => {
+    const li = document.createElement("li");
+    const praise = r.kind === "praise";
+    li.append(`${praise ? "🌸" : "🙅"} ${r.name || "?"} đã ${praise ? "khen" : "chê"} hoa `);
+    const p = getPoem(r.pid);
+    if (p && p.status === "garden") {
+      const a = document.createElement("button");
+      a.type = "button"; a.className = "to-flower"; a.textContent = "[tới hoa]";
+      a.title = (p.texts[0] || "").split("\n").find((l) => l.trim()) || "";
+      a.addEventListener("click", () => { closeLog(); goToPoem(r.pid); });
+      li.append(a);
+    } else li.append(p ? "(hoa đang trong giỏ)" : "(hoa đã bị xóa)");
+    if (r.t) { const t = document.createElement("small"); t.textContent = " · " + fmtTime(r.t); li.append(t); }
+    ul.appendChild(li);
+  });
+}
+$("log-tab-visits").addEventListener("click", () => setLogTab("visits"));
+$("log-tab-react").addEventListener("click", () => setLogTab("react"));
 function openLog() {
   if (!isOwner()) return;
   $("log-overlay").hidden = false;
+  setLogTab("visits");
   logQuery = db.ref("visits").limitToLast(300);
   logCb = logQuery.on("value", (s) => renderLog(s.val()));
 }
 function closeLog() {
   $("log-overlay").hidden = true;
+  if (reactHistRef) { try { reactHistRef.off("value", reactHistCb); } catch {} reactHistRef = null; }
   if (logQuery) { logQuery.off("value", logCb); logQuery = null; }
 }
 $("log-btn").addEventListener("click", openLog);
