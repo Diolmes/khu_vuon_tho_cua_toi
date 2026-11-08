@@ -739,11 +739,18 @@ function renderPoem(p) {
 // Chữ không tự rơi xuống dòng (chỉ xuống dòng khi người viết chủ ý): câu nào dài hơn khung thì thu nhỏ chữ cho vừa, tối thiểu 70%, quá nữa thì cuộn ngang
 function fitPoem() {
   poemText.style.fontSize = "";
+  poemText.querySelectorAll(".line.wrap").forEach((l) => l.classList.remove("wrap"));
   if (panel.hidden) return;
-  const cw = poemText.clientWidth, sw = poemText.scrollWidth;
-  if (cw > 0 && sw > cw + 1) {
-    const base = parseFloat(getComputedStyle(poemText).fontSize);
-    poemText.style.fontSize = Math.max(base * 0.7, (base * cw) / sw) + "px";
+  const cw = poemText.clientWidth - 6;                       // chừa mép để chữ nghiêng không bị cắt
+  if (cw <= 0) return;
+  const wide = () => Math.max(0, ...[...poemText.querySelectorAll(".line")].map((l) => l.scrollWidth));
+  const base = parseFloat(getComputedStyle(poemText).fontSize);
+  let sw = wide();
+  if (sw > cw) {
+    const k = Math.max(0.6, cw / sw);                        // thu nhỏ chữ, tối đa còn 60%
+    poemText.style.fontSize = base * k + "px";
+    // dòng nào vẫn dài hơn khung thì cho phép xuống dòng, thà xuống dòng còn hơn mất chữ
+    poemText.querySelectorAll(".line").forEach((l) => { if (l.scrollWidth > cw) l.classList.add("wrap"); });
   }
 }
 window.addEventListener("resize", fitPoem);

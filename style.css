@@ -372,7 +372,8 @@ body.mode-fert #bin { animation: pulse 1s ease-in-out infinite; border-style: so
 #poem-meta:empty { display: none; }
 #poem-text { line-height: 1.75; font-size: 1.1rem; }
 .line { white-space: nowrap; }                /* chữ không tự rơi xuống dòng: chỉ xuống dòng khi người viết bấm Enter. Câu quá dài thì thu nhỏ chữ cho vừa (fitPoem) */
-#poem-text { overflow-x: auto; scrollbar-width: thin; }
+#poem-text { padding-right: 4px; }
+.line.wrap { white-space: normal; text-wrap: balance; }   /* dòng quá dài dù đã thu nhỏ tối đa: được phép xuống dòng để không mất chữ */
 .line.gap { height: .8em; }                   /* khoảng ngăn giữa các khổ thơ */
 .sep { text-align: center; opacity: .45; margin: 14px 0; letter-spacing: 8px; }
 .word {
