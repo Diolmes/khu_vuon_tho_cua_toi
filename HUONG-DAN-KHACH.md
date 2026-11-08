@@ -43,4 +43,6 @@ Bấm **🎭 Hóa thân chủ vườn** để thử làm chủ vườn: gieo h�
 ### Đổi giao diện ✨
 Bấm nút ✨ Giao diện (trên điện thoại là icon ✨) để đổi phong cách vườn: Mặc định, Màu nước hoặc Doodle, và chọn font chữ cho hợp mắt. Lựa chọn chỉ đổi trên máy bạn.
 
+
+
 Đừng dẫm lên hoa. Có góp ý khiếu nại gì thì nhắn tin cho chủ vườn nhé (vui thì rep buồn thì thôi). Chúc bạn một buổi dạo vườn thơ vui ^^

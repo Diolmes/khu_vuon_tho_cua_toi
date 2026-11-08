@@ -2748,7 +2748,17 @@ function renderMarkdown(md, root) {
   while (i < lines.length) {
     const line = lines[i];
     let m;
-    if (!line.trim()) { lists = []; i++; continue; }
+    if (!line.trim()) {
+      lists = [];
+      let n = 0;
+      while (i < lines.length && !lines[i].trim()) { n++; i++; }
+      if (n >= 2 && root.lastChild && i < lines.length) {       // chừa thêm dòng trống = thêm khoảng cách (dòng trống đầu tiên chỉ là ngăn đoạn)
+        const gap = document.createElement("div");
+        gap.style.height = (n - 1) * 1.2 + "em";
+        root.append(gap);
+      }
+      continue;
+    }
     if ((m = /^(#{1,3})\s+(.*)$/.exec(line))) {
       lists = [];
       if (m[1] !== "#") { const h = document.createElement(m[1] === "##" ? "h3" : "h4"); mdInline(h, m[2]); root.append(h); }
