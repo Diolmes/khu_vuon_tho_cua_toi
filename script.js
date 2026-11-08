@@ -2833,6 +2833,8 @@ $("help-close").addEventListener("click", closeHelp);
 $("help-overlay").addEventListener("click", (e) => { if (e.target === $("help-overlay")) closeHelp(); });
 
 // ---------- Ai đang trong vườn + con trỏ ----------
+const seenAt = {};         // uid -> giờ (máy này) lần cuối thấy người đó còn hoạt động
+const GHOST_MS = 150000;   // quá 150s không có tín hiệu (heartbeat 20s/lần) thì coi như đã rời, dù máy chủ chưa kịp xóa
 const peers = {};            // uid -> {name, role, x, y, t}
 const cursorEls = {};
 const hueOf = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
@@ -2852,6 +2854,7 @@ function setPeer(uid, d) {
     return;
   }
   peers[uid] = d;
+  seenAt[uid] = Date.now();                               // lần cuối nhận được tín hiệu từ người này
   updateWho();
   const hasChar = setCharacter(uid, d);
   if (uid === ME.uid) return;
@@ -2871,6 +2874,7 @@ function setPeer(uid, d) {
 }
 function removePeer(uid) {
   delete peers[uid];
+  delete seenAt[uid];
   removeCharacter(uid);
   cursorEls[uid]?.remove();
   delete cursorEls[uid];
@@ -2897,6 +2901,12 @@ function startPresence() {
     const a = isOwner() ? "" : myAvatar();
     me.update({ t: Date.now(), name: ME.name, role: ROLE, ...(a ? { avatar: a } : {}) });
   }, 20000);
+  // tắt tab / đóng trình duyệt: báo rời ngay (nếu gửi kịp); máy chủ cũng tự xóa khi mất kết nối (onDisconnect)
+  window.addEventListener("pagehide", () => { try { me.remove(); } catch {} });
+  // dọn "bóng ma": người đã đóng tab nhưng máy chủ chưa xóa kịp (điện thoại treo tab, trình duyệt trong Messenger...)
+  setInterval(() => Object.keys(peers).forEach((u) => {
+    if (u !== ME.uid && Date.now() - (seenAt[u] || 0) > GHOST_MS) removePeer(u);
+  }), 10000);
   setInterval(() => Object.keys(cursorEls).forEach((u) => {
     cursorEls[u].classList.toggle("idle", Date.now() - (peers[u]?.t || 0) > 45000);
   }), 10000);
