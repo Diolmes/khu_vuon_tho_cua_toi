@@ -695,6 +695,7 @@ function openPoem(id, fromBasket = false) {
   setupPanelExtras(p, fromBasket);
   panel.hidden = false;
   panel.style.animation = "none"; panel.offsetHeight; panel.style.animation = "";
+  fitPoem();
   applyGlow();
 }
 
@@ -731,6 +732,26 @@ function renderPoem(p) {
       });
       poemText.appendChild(div);
     });
+  });
+  fitPoem();
+}
+
+// Chữ không tự rơi xuống dòng (chỉ xuống dòng khi người viết chủ ý): câu nào dài hơn khung thì thu nhỏ chữ cho vừa, tối thiểu 70%, quá nữa thì cuộn ngang
+function fitPoem() {
+  poemText.style.fontSize = "";
+  if (panel.hidden) return;
+  const cw = poemText.clientWidth, sw = poemText.scrollWidth;
+  if (cw > 0 && sw > cw + 1) {
+    const base = parseFloat(getComputedStyle(poemText).fontSize);
+    poemText.style.fontSize = Math.max(base * 0.7, (base * cw) / sw) + "px";
+  }
+}
+window.addEventListener("resize", fitPoem);
+function fitCards() {
+  document.querySelectorAll(".card-text").forEach((t) => {
+    t.style.fontSize = t.dataset.fs || "";
+    const cw = t.clientWidth - 8, sw = t.scrollWidth;
+    if (cw > 0 && sw > cw) t.style.fontSize = Math.max(2, parseFloat(getComputedStyle(t).fontSize) * Math.max(0.4, cw / sw)) + "px";
   });
 }
 
@@ -809,6 +830,7 @@ function openBasket() {
   closePanel();
   renderBasket();
   $("basket-overlay").hidden = false;
+  fitCards();
 }
 function closeBasket() { $("basket-overlay").hidden = true; }
 
@@ -846,6 +868,7 @@ function buildCard(p) {
     t.style.width = (w / vbW) * 100 + "%";
     t.style.height = (h / vbH) * 100 + "%";
     t.style.fontSize = Math.max(3, (w / vbW) * 100 * 0.14) + "cqw";
+    t.dataset.fs = t.style.fontSize;
     art.appendChild(t);
   });
   art.addEventListener("click", () => openPoem(p.id, true));      // bấm vào hoa: bài thơ hiện như hoa trong vườn
@@ -1804,7 +1827,7 @@ const fallenEl = (id) => gardenEl.querySelector(`.fallen[data-id="${id}"]`);
 function refreshAfterPoems() {
   updateBasketCount();
   refreshHint();
-  if (!$("basket-overlay").hidden) renderBasket();
+  if (!$("basket-overlay").hidden) { renderBasket(); fitCards(); }
 }
 function applyPoem(id, d) {
   const np = poemFromDb(id, d);

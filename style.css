@@ -371,7 +371,8 @@ body.mode-fert #bin { animation: pulse 1s ease-in-out infinite; border-style: so
 #poem-meta { margin: 0 0 8px; font-size: .8rem; font-style: italic; opacity: .6; }
 #poem-meta:empty { display: none; }
 #poem-text { line-height: 1.75; font-size: 1.1rem; }
-.line { text-wrap: balance; }                 /* câu dài xuống dòng thì chia đều hai dòng, không để một chữ cụt lủn */
+.line { white-space: nowrap; }                /* chữ không tự rơi xuống dòng: chỉ xuống dòng khi người viết bấm Enter. Câu quá dài thì thu nhỏ chữ cho vừa (fitPoem) */
+#poem-text { overflow-x: auto; scrollbar-width: thin; }
 .line.gap { height: .8em; }                   /* khoảng ngăn giữa các khổ thơ */
 .sep { text-align: center; opacity: .45; margin: 14px 0; letter-spacing: 8px; }
 .word {
@@ -440,9 +441,9 @@ body.mode-fert #bin { animation: pulse 1s ease-in-out infinite; border-style: so
   font-size: 11px;
   line-height: 1.35;
   text-align: center;
-  white-space: pre-wrap;
-  overflow-y: auto;
-  scrollbar-width: thin;
+  white-space: pre;               /* không tự xuống dòng; câu dài thì thu nhỏ chữ (fitCards) */
+  overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center;
   background: rgba(255, 253, 247, .88);
   border-radius: 12px;
   transition: all .25s;
