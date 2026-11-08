@@ -149,9 +149,19 @@ Bấm **🏚️ Lán** để vào lán nghiên cứu, nơi bạn cất những h
 | 📖 Nhật ký | Ai đã vào vườn lúc nào, rời lúc nào |
 | 📤 Sao lưu | Tải cả vườn về thành file `.json` |
 | 📥 Nhập | Nhập vườn từ file sao lưu, hoặc vườn cũ còn trong trình duyệt |
+| ✨ Giao diện | Đổi phong cách và bộ chữ (xem bên dưới) |
 | 🚪 Rời vườn | Thoát |
 
 Sao lưu nên làm thỉnh thoảng. File sao lưu gồm hoa (kể cả ngày viết, hoa tặng), chữ rơi và thùng phân. Nhập thì hoa trùng mã được ghi đè.
+
+### Đổi giao diện ✨
+
+Bấm **✨ Giao diện** (trên điện thoại chỉ còn icon) để mở bảng chọn:
+- **Phong cách**: **Mặc định**, **Màu nước** (nền giấy loang, hoa và icon vẽ màu nước) hoặc **Doodle** (giấy vở kẻ ngang, nét mực viền, icon nét mực).
+- **Bộ chữ**: Georgia (gốc), Cormorant Garamond + EB Garamond, Playfair Display, Newsreader, Josefin Sans, Shantell Sans + Patrick Hand (nét tay), Spectral + Lora.
+- Lựa chọn chỉ lưu **trên trình duyệt của bạn**, mỗi người (kể cả khách) tự chọn riêng. Không ai khác thấy đổi theo và dữ liệu vườn không bị ảnh hưởng.
+- Gõ thẳng lên địa chỉ cũng được, ví dụ `?theme=doodle&font=doodle` hoặc `?theme=watercolor`. Muốn quay về như cũ thì chọn Mặc định.
+- Phong cách Màu nước và Doodle nặng hơn một chút nên máy yếu có thể chậm; khi đó dùng Mặc định.
 
 ## 11. Dữ liệu và an toàn
 
