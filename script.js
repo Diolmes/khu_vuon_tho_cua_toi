@@ -867,6 +867,14 @@ function buildCard(p) {
   const gift = document.createElement("button");
   gift.textContent = "🎁 Tặng";
   gift.addEventListener("click", () => askGift(p));
+  const clone = document.createElement("button");
+  clone.textContent = "📄 Nhân bản";
+  clone.title = "Tạo thêm một bản sao nằm trong giỏ, để tặng mà vẫn giữ lại bản gốc";
+  clone.addEventListener("click", () => {
+    const id = newId();
+    db.ref("garden/poems/" + id).set(poemToDb({ ...p, id, status: "basket", missing: [], texts: p.texts.slice() }));
+    toast("Đã nhân bản, bản sao nằm trong giỏ 📄");
+  });
   const trash = document.createElement("button");
   trash.textContent = "🗑️ Thùng rác hữu cơ";
   trash.addEventListener("click", () => {
@@ -875,6 +883,7 @@ function buildCard(p) {
     toast("Đã bỏ bông hoa vào thùng rác hữu cơ 🗑️");
   });
   actions.append(replant);
+  if (isOwner() && !p.gift) actions.append(clone);   // nhân bản: chỉ chủ vườn, hoa khách tặng thì không
   if (isOwner()) actions.append(trash);          // xóa hẳn: chỉ chủ vườn
   if (isOwner() && !p.gift) actions.append(gift);   // chỉ chủ vườn được tặng hoa, và hoa được tặng thì không tặng lại
   card.appendChild(actions);

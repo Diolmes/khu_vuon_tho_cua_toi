@@ -46,6 +46,7 @@ Trong bảng thơ:
 
 Hoa đã hái nằm trong giỏ. Bấm vào bông trong giỏ để đọc thơ. Mỗi hoa trong giỏ có:
 - **🌱 Trồng lại**: bấm vào chỗ trống trong vườn để trồng lại (không chọn được đường đi).
+- **📄 Nhân bản**: tạo thêm một bản sao của hoa, bản sao nằm ngay trong giỏ. Dùng khi muốn tặng mà vẫn giữ lại một bản: tặng bản sao, bản gốc cứ để lại trong giỏ hoặc trồng lại. Hoa do khách tặng (đen trắng) thì không nhân bản được.
 - **🗑️ Thùng rác hữu cơ**: xóa hẳn, không lấy lại được.
 - **🎁 Tặng**: viết tên người nhận (hoặc bỏ qua), web vẽ tấm thẻ hoa thành ảnh và chép vào clipboard để bạn dán gửi. Nếu trình duyệt không cho chép thì tải ảnh về máy. Gửi xong, hoa bị bỏ khỏi giỏ. Hoa do khách tặng (đen trắng) thì không tặng lại được.
 
