@@ -52,6 +52,9 @@ Bạn có thể hái một bông hoa bỏ vào giỏ và trồng lại ở chỗ
 ### Vẽ nhân vật 🎨
 Bấm **🎨 Nhân vật** (hoặc nút vẽ ở màn hình vào vườn) để vẽ nhân vật của bạn bằng bút marker. Có bánh xe màu, thanh chỉnh sáng/tối và cỡ nét, có tẩy và hoàn tác. Xong rồi, nhân vật sẽ đi dạo trong vườn theo con trỏ của bạn (chỉ đi trên phần đất), tên bạn nằm dưới chân. Mọi người trong vườn sẽ thấy nhân vật của nhau. Lười vẽ thì bấm **📷 Tách nhân vật từ ảnh**, chọn một tấm ảnh (nền trơn như tường hay giấy trắng là tách đẹp nhất), web tự bỏ nền giữ lại nhân vật; kéo thanh "Độ tách nền" hoặc dùng cục tẩy để dọn chỗ còn sót. Không thích thì bấm "Không dùng nhân vật".
 
+### Đổi giao diện ✨
+Bấm nút **✨ Giao diện** (trên điện thoại chỉ còn icon ✨) để đổi phong cách vườn: **Mặc định**, **Màu nước** hoặc **Doodle** (nét mực như vẽ trong vở), và chọn bộ chữ cho hợp mắt. Lựa chọn chỉ đổi trên máy bạn, web nhớ cho lần sau, không ảnh hưởng ai khác.
+
 ### Hóa thân thành chủ vườn 🎭
 Bấm **🎭 Hóa thân chủ vườn** để thử làm chủ vườn: gieo hạt, sửa thơ, dời hoa, gọi ong…
 
