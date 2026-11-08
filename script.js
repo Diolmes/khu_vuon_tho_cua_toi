@@ -2159,6 +2159,22 @@ function wordSnippet(p, word) {
   });
   return box;
 }
+// khung preview nằm ngay dưới thanh nút (và dòng "Trong vườn") thay vì một con số cố định, để không đè lên nhau ở mọi cỡ màn hình/theme
+function placeZonePreviews() {
+  const box = $("zone-previews");
+  if (box.hidden) return;
+  const tb = $("toolbar").getBoundingClientRect(), who = $("who");
+  const tooWide = tb.left < 230;                           // thanh nút trải ngang qua chỗ khung: đặt khung xuống dưới nó
+  let top = 64;
+  if (tooWide) {
+    top = tb.bottom + 8;
+    if (!who.hidden) top = Math.max(top, who.getBoundingClientRect().bottom + 8);
+  }
+  box.style.top = top + "px";
+  box.style.maxHeight = Math.max(120, window.innerHeight - top - 150) + "px";
+  box.style.overflowY = "auto";
+}
+window.addEventListener("resize", placeZonePreviews);
 function renderZonePreviews() {
   const box = $("zone-previews");
   box.innerHTML = "";
@@ -2188,6 +2204,7 @@ function renderZonePreviews() {
     more.textContent = `và ${others.length - 4} bông nữa`;
     box.appendChild(more);
   }
+  placeZonePreviews();
 }
 
 // ----- Tìm hoa theo từ khóa (không phân biệt dấu) -----
